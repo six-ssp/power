@@ -1,0 +1,8 @@
+﻿name,value
+full_blend_weights,"{'xgboost_prediction': 0.7, 'dnn_prediction': 0.2, 'tft_prediction': 0.10000000000000009}"
+full_physics_alpha,0.600000
+equal_weight_physics_alpha,0.600000
+adaptive_blend_avg_val_weights,"{'persistence_prediction': 0.1632891446352005, 'xgboost_prediction': 0.24613110721111298, 'dnn_prediction': 0.2304449826478958, 'tft_prediction': 0.3601384162902832}"
+adaptive_blend_avg_test_weights,"{'persistence_prediction': 0.17404016852378845, 'xgboost_prediction': 0.25216618180274963, 'dnn_prediction': 0.21423447132110596, 'tft_prediction': 0.3595584034919739}"
+adaptive_blend_physics_alpha,0.600000
+stacked_xgboost_physics_alpha,0.600000

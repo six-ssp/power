@@ -1,0 +1,82 @@
+{
+  "python_version": "3.12.6",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "torch_version": "2.10.0+cu128",
+  "cuda_available": true,
+  "cuda_device": "NVIDIA GeForce RTX 4070 Laptop GPU",
+  "dataset_files": [
+    "data_1A.csv",
+    "data_1C.csv",
+    "data_3A.csv",
+    "dtat_4A.csv"
+  ],
+  "raw_shape": [
+    1242372,
+    40
+  ],
+  "supervised_shape": [
+    1241216,
+    111
+  ],
+  "train_shape": [
+    992740,
+    111
+  ],
+  "val_shape": [
+    124236,
+    111
+  ],
+  "test_shape": [
+    124240,
+    111
+  ],
+  "feature_count": 96,
+  "encoded_feature_count": 111,
+  "train_matrix_shape": [
+    992740,
+    111
+  ],
+  "val_matrix_shape": [
+    124236,
+    111
+  ],
+  "test_matrix_shape": [
+    124240,
+    111
+  ],
+  "project_file_status": {
+    "README.md": true,
+    "requirements.txt": true,
+    "run_experiments.py": true,
+    "pvbench\\config.py": true,
+    "pvbench\\data.py": true,
+    "pvbench\\models.py": true,
+    "pvbench\\reporting.py": true
+  },
+  "artifact_status": {
+    "artifacts\\metrics\\baseline_metrics.csv": true,
+    "artifacts\\metrics\\ablation_metrics.csv": true,
+    "artifacts\\metrics\\plant_level_metrics.csv": true,
+    "artifacts\\metrics\\validation_predictions.csv": true,
+    "artifacts\\metrics\\test_predictions.csv": true,
+    "artifacts\\plots\\baseline_mae_rmse.png": true,
+    "artifacts\\plots\\forecast_examples.png": true,
+    "artifacts\\plots\\training_curves.png": true,
+    "artifacts\\reports\\training_log_zh.md": true,
+    "artifacts\\reports\\paper_outline_zh.md": true,
+    "artifacts\\reports\\method_story_zh.md": true,
+    "artifacts\\reports\\result_summary_zh.md": true,
+    "artifacts\\paper_figures\\method_framework.png": true
+  },
+  "checks": {
+    "project_files_complete": true,
+    "artifact_files_complete": true,
+    "baseline_models_complete": true,
+    "ablation_models_complete": true,
+    "plant_results_complete": true,
+    "baseline_metrics_non_null": true,
+    "ablation_metrics_non_null": true,
+    "plant_metrics_non_null": true,
+    "cuda_available": true
+  }
+}

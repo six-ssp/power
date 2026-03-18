@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+dataset/
+
+artifacts/logs/
+artifacts/metrics/test_predictions.csv
+artifacts/metrics/validation_predictions.csv
+
+.DS_Store
+Thumbs.db
