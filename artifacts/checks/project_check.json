@@ -8,7 +8,7 @@
     "data_1A.csv",
     "data_1C.csv",
     "data_3A.csv",
-    "dtat_4A.csv"
+    "data_4A.csv"
   ],
   "raw_shape": [
     1242372,
@@ -23,11 +23,11 @@
     111
   ],
   "val_shape": [
-    124236,
+    123948,
     111
   ],
   "test_shape": [
-    124240,
+    123952,
     111
   ],
   "feature_count": 96,
@@ -37,11 +37,11 @@
     111
   ],
   "val_matrix_shape": [
-    124236,
+    123948,
     111
   ],
   "test_matrix_shape": [
-    124240,
+    123952,
     111
   ],
   "project_file_status": {
@@ -57,15 +57,25 @@
     "artifacts\\metrics\\baseline_metrics.csv": true,
     "artifacts\\metrics\\ablation_metrics.csv": true,
     "artifacts\\metrics\\plant_level_metrics.csv": true,
+    "artifacts\\metrics\\baseline_daytime_metrics.csv": true,
+    "artifacts\\metrics\\plant_level_daytime_metrics.csv": true,
+    "artifacts\\metrics\\subset_counts.csv": true,
+    "artifacts\\metrics\\seed_repeat_metrics.csv": true,
+    "artifacts\\metrics\\seed_repeat_summary.csv": true,
+    "artifacts\\metrics\\rolling_origin_metrics.csv": true,
+    "artifacts\\metrics\\rolling_origin_summary.csv": true,
+    "artifacts\\metrics\\rolling_origin_windows.csv": true,
     "artifacts\\metrics\\validation_predictions.csv": true,
     "artifacts\\metrics\\test_predictions.csv": true,
     "artifacts\\plots\\baseline_mae_rmse.png": true,
+    "artifacts\\plots\\baseline_daytime_mae_rmse.png": true,
     "artifacts\\plots\\forecast_examples.png": true,
     "artifacts\\plots\\training_curves.png": true,
     "artifacts\\reports\\training_log_zh.md": true,
     "artifacts\\reports\\paper_outline_zh.md": true,
     "artifacts\\reports\\method_story_zh.md": true,
     "artifacts\\reports\\result_summary_zh.md": true,
+    "artifacts\\reports\\robustness_summary_zh.md": true,
     "artifacts\\paper_figures\\method_framework.png": true
   },
   "checks": {
@@ -74,9 +84,17 @@
     "baseline_models_complete": true,
     "ablation_models_complete": true,
     "plant_results_complete": true,
+    "daytime_models_complete": true,
+    "daytime_plants_complete": true,
+    "seed_summary_models_complete": true,
+    "rolling_summary_models_complete": true,
+    "rolling_window_count_correct": true,
     "baseline_metrics_non_null": true,
     "ablation_metrics_non_null": true,
     "plant_metrics_non_null": true,
+    "daytime_metrics_non_null": true,
+    "seed_repeat_non_null": true,
+    "rolling_origin_non_null": true,
     "cuda_available": true
   }
 }

@@ -11,10 +11,14 @@ from sklearn.metrics import r2_score
 plt.switch_backend("Agg")
 
 PLANT_TITLE_MAP = {
-    "Plant_1A_单晶双轴": "Plant 1A (Dual Axis)",
-    "Plant_1C_多晶固定": "Plant 1C (Fixed Poly)",
-    "Plant_3A_多晶大型": "Plant 3A (Utility Poly)",
-    "Plant_4A_高效对比": "Plant 4A (High Efficiency)",
+    "AliceSprings_MonoTrack_1A": "MonoTrack 1A",
+    "AliceSprings_PolyFixed_1C": "PolyFixed 1C",
+    "AliceSprings_PolyUtility_3A": "PolyUtility 3A",
+    "AliceSprings_HighEfficiency_4A": "HighEfficiency 4A",
+    "Plant_1A_单晶双轴": "MonoTrack 1A",
+    "Plant_1C_多晶固定": "PolyFixed 1C",
+    "Plant_3A_多晶大型": "PolyUtility 3A",
+    "Plant_4A_高效对比": "HighEfficiency 4A",
 }
 
 
@@ -40,6 +44,25 @@ def compute_metrics(frame: pd.DataFrame, prediction_column: str) -> dict[str, fl
         "Bias": float(np.mean(error)),
         "Samples": int(len(frame)),
     }
+
+
+def filter_daytime_frame(frame: pd.DataFrame) -> pd.DataFrame:
+    if "forecast_night_flag" not in frame.columns:
+        raise KeyError("Expected 'forecast_night_flag' in prediction frame to build daytime-only metrics.")
+    return frame[frame["forecast_night_flag"] == 0].copy()
+
+
+def summarize_repeated_metrics(metric_frame: pd.DataFrame, id_column: str) -> pd.DataFrame:
+    metric_columns = ["MAE", "RMSE", "MAPE", "sMAPE", "R2", "PredMean", "ActualMean", "Bias", "Samples"]
+    rows: list[dict[str, float | str | int]] = []
+
+    for model_name, model_frame in metric_frame.groupby("Model", sort=False):
+        row: dict[str, float | str | int] = {"Model": model_name, "Runs": int(model_frame[id_column].nunique())}
+        for column in metric_columns:
+            row[f"{column}_mean"] = float(model_frame[column].mean())
+            row[f"{column}_std"] = float(model_frame[column].std(ddof=0))
+        rows.append(row)
+    return pd.DataFrame(rows)
 
 
 def save_metrics_table(rows: list[dict[str, float | str]], path: Path) -> pd.DataFrame:

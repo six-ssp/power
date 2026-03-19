@@ -13,6 +13,13 @@ COLUMN_MAP = {
     "实际功率": "power",
 }
 
+LEGACY_PLANT_ID_MAP = {
+    "Plant_1A_单晶双轴": "AliceSprings_MonoTrack_1A",
+    "Plant_1C_多晶固定": "AliceSprings_PolyFixed_1C",
+    "Plant_3A_多晶大型": "AliceSprings_PolyUtility_3A",
+    "Plant_4A_高效对比": "AliceSprings_HighEfficiency_4A",
+}
+
 WEATHER_COLUMNS = [
     "irradiance",
     "temperature",
@@ -22,26 +29,38 @@ WEATHER_COLUMNS = [
     "global_radiation",
 ]
 
-PLANT_METADATA = {
-    "Plant_1A_单晶双轴": {
+CANONICAL_PLANT_METADATA = {
+    "AliceSprings_MonoTrack_1A": {
         "plant_name_en": "plant_1a_dual_axis",
+        "plant_display_name": "MonoTrack 1A",
         "module_type": "mono",
         "mounting_type": "dual_axis_tracking",
     },
-    "Plant_1C_多晶固定": {
+    "AliceSprings_PolyFixed_1C": {
         "plant_name_en": "plant_1c_fixed",
+        "plant_display_name": "PolyFixed 1C",
         "module_type": "poly",
         "mounting_type": "fixed_tilt",
     },
-    "Plant_3A_多晶大型": {
+    "AliceSprings_PolyUtility_3A": {
         "plant_name_en": "plant_3a_utility",
+        "plant_display_name": "PolyUtility 3A",
         "module_type": "poly",
         "mounting_type": "utility_scale",
     },
-    "Plant_4A_高效对比": {
+    "AliceSprings_HighEfficiency_4A": {
         "plant_name_en": "plant_4a_high_efficiency",
+        "plant_display_name": "HighEfficiency 4A",
         "module_type": "advanced",
         "mounting_type": "comparison_array",
+    },
+}
+
+PLANT_METADATA = {
+    **CANONICAL_PLANT_METADATA,
+    **{
+        legacy_name: CANONICAL_PLANT_METADATA[canonical_name]
+        for legacy_name, canonical_name in LEGACY_PLANT_ID_MAP.items()
     },
 }
 
@@ -59,6 +78,7 @@ class ExperimentConfig:
     horizon: int = 1
     train_ratio: float = 0.8
     val_ratio: float = 0.1
+    split_gap_steps: int = 72
     lags: tuple[int, ...] = (1, 2, 3, 6, 12, 24, 288)
     rolling_windows: tuple[int, ...] = (3, 12, 24)
     dnn_hidden_dims: tuple[int, ...] = (256, 128, 64)
@@ -78,6 +98,12 @@ class ExperimentConfig:
     blend_step: float = 0.05
     night_radiation_threshold: float = 20.0
     night_alpha_grid: tuple[float, ...] = (0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6)
+    robustness_seeds: tuple[int, ...] = (42, 52, 62)
+    rolling_origin_windows: tuple[tuple[float, float, float], ...] = (
+        (0.6, 0.7, 0.8),
+        (0.7, 0.8, 0.9),
+        (0.8, 0.9, 1.0),
+    )
     meta_train_ratio: float = 0.8
     adaptive_hidden_dims: tuple[int, ...] = (128, 64)
     adaptive_dropout: float = 0.1
@@ -85,6 +111,11 @@ class ExperimentConfig:
     adaptive_epochs: int = 30
     adaptive_patience: int = 5
     adaptive_learning_rate: float = 5e-4
+    hybrid_weight_step: float = 0.05
+    hybrid_min_weight: float = 0.0
+    hybrid_rmse_weight: float = 0.3
+    hybrid_low_radiation_candidates: tuple[float, ...] = (50.0, 100.0, 150.0, 200.0)
+    hybrid_high_radiation_candidates: tuple[float, ...] = (400.0, 500.0, 600.0, 700.0)
     num_workers: int = 4
     xgb_predict_on_cpu: bool = True
     stack_xgb_params: dict = field(

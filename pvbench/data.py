@@ -6,7 +6,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .config import COLUMN_MAP, PLANT_METADATA, SITE_METADATA, WEATHER_COLUMNS, ExperimentConfig
+from .config import (
+    COLUMN_MAP,
+    LEGACY_PLANT_ID_MAP,
+    PLANT_METADATA,
+    SITE_METADATA,
+    WEATHER_COLUMNS,
+    ExperimentConfig,
+)
 
 
 @dataclass
@@ -22,6 +29,9 @@ class PreparedData:
     physics_feature_columns: list[str]
     train_cutoff: int
     val_cutoff: int
+    val_start_idx: int
+    test_start_idx: int
+    test_cutoff: int
 
 
 TIME_FEATURES = [
@@ -73,16 +83,23 @@ def load_and_prepare_data(config: ExperimentConfig) -> PreparedData:
         raise ValueError("All plants must have the same number of timestamps for this experiment setup.")
 
     total_steps = group_sizes[0]
-    train_cutoff = int(total_steps * config.train_ratio) - 1
-    val_cutoff = int(total_steps * (config.train_ratio + config.val_ratio)) - 1
+    split_indices = compute_split_indices(
+        total_steps=total_steps,
+        train_end_ratio=config.train_ratio,
+        val_end_ratio=config.train_ratio + config.val_ratio,
+        test_end_ratio=1.0,
+        split_gap_steps=config.split_gap_steps,
+    )
 
     supervised_frame, feature_columns = build_supervised_frame(raw_frame, config)
-    train_frame = supervised_frame[supervised_frame["forecast_time_idx"] <= train_cutoff].copy()
-    val_frame = supervised_frame[
-        (supervised_frame["forecast_time_idx"] > train_cutoff)
-        & (supervised_frame["forecast_time_idx"] <= val_cutoff)
-    ].copy()
-    test_frame = supervised_frame[supervised_frame["forecast_time_idx"] > val_cutoff].copy()
+    train_frame, val_frame, test_frame = slice_supervised_frame(
+        supervised_frame=supervised_frame,
+        train_cutoff=split_indices["train_cutoff"],
+        val_start_idx=split_indices["val_start_idx"],
+        val_cutoff=split_indices["val_cutoff"],
+        test_start_idx=split_indices["test_start_idx"],
+        test_cutoff=split_indices["test_cutoff"],
+    )
 
     return PreparedData(
         raw_frame=raw_frame,
@@ -94,15 +111,124 @@ def load_and_prepare_data(config: ExperimentConfig) -> PreparedData:
         categorical_columns=CATEGORICAL_FEATURES,
         geo_feature_columns=GEO_FEATURES,
         physics_feature_columns=PHYSICS_FEATURES,
-        train_cutoff=train_cutoff,
-        val_cutoff=val_cutoff,
+        train_cutoff=split_indices["train_cutoff"],
+        val_cutoff=split_indices["val_cutoff"],
+        val_start_idx=split_indices["val_start_idx"],
+        test_start_idx=split_indices["test_start_idx"],
+        test_cutoff=split_indices["test_cutoff"],
     )
 
+
+def compute_split_indices(
+    total_steps: int,
+    train_end_ratio: float,
+    val_end_ratio: float,
+    test_end_ratio: float,
+    split_gap_steps: int,
+) -> dict[str, int]:
+    if not 0.0 < train_end_ratio < val_end_ratio < test_end_ratio <= 1.0:
+        raise ValueError(
+            "Split ratios must satisfy 0 < train_end_ratio < val_end_ratio < test_end_ratio <= 1. "
+            f"Received train_end_ratio={train_end_ratio}, val_end_ratio={val_end_ratio}, "
+            f"test_end_ratio={test_end_ratio}."
+        )
+
+    train_cutoff = int(total_steps * train_end_ratio) - 1
+    val_cutoff = int(total_steps * val_end_ratio) - 1
+    test_cutoff = min(int(total_steps * test_end_ratio) - 1, total_steps - 1)
+    val_start_idx = train_cutoff + split_gap_steps + 1
+    test_start_idx = val_cutoff + split_gap_steps + 1
+
+    if val_start_idx > val_cutoff:
+        raise ValueError(
+            "split_gap_steps is too large for the train/validation boundary. "
+            f"Received split_gap_steps={split_gap_steps}, total_steps={total_steps}, "
+            f"train_cutoff={train_cutoff}, val_cutoff={val_cutoff}."
+        )
+    if test_start_idx > test_cutoff:
+        raise ValueError(
+            "split_gap_steps is too large for the validation/test boundary. "
+            f"Received split_gap_steps={split_gap_steps}, total_steps={total_steps}, "
+            f"val_cutoff={val_cutoff}, test_cutoff={test_cutoff}."
+        )
+
+    return {
+        "train_cutoff": train_cutoff,
+        "val_start_idx": val_start_idx,
+        "val_cutoff": val_cutoff,
+        "test_start_idx": test_start_idx,
+        "test_cutoff": test_cutoff,
+    }
+
+
+def slice_supervised_frame(
+    supervised_frame: pd.DataFrame,
+    train_cutoff: int,
+    val_start_idx: int,
+    val_cutoff: int,
+    test_start_idx: int,
+    test_cutoff: int,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    train_frame = supervised_frame[supervised_frame["forecast_time_idx"] <= train_cutoff].copy()
+    val_frame = supervised_frame[
+        (supervised_frame["forecast_time_idx"] >= val_start_idx)
+        & (supervised_frame["forecast_time_idx"] <= val_cutoff)
+    ].copy()
+    test_frame = supervised_frame[
+        (supervised_frame["forecast_time_idx"] >= test_start_idx)
+        & (supervised_frame["forecast_time_idx"] <= test_cutoff)
+    ].copy()
+    return train_frame, val_frame, test_frame
+
+
+def build_windowed_prepared_data(
+    prepared_data: PreparedData,
+    train_end_ratio: float,
+    val_end_ratio: float,
+    test_end_ratio: float,
+    split_gap_steps: int,
+) -> PreparedData:
+    total_steps = int(prepared_data.raw_frame.groupby("plant_id").size().iloc[0])
+    split_indices = compute_split_indices(
+        total_steps=total_steps,
+        train_end_ratio=train_end_ratio,
+        val_end_ratio=val_end_ratio,
+        test_end_ratio=test_end_ratio,
+        split_gap_steps=split_gap_steps,
+    )
+    train_frame, val_frame, test_frame = slice_supervised_frame(
+        supervised_frame=prepared_data.supervised_frame,
+        train_cutoff=split_indices["train_cutoff"],
+        val_start_idx=split_indices["val_start_idx"],
+        val_cutoff=split_indices["val_cutoff"],
+        test_start_idx=split_indices["test_start_idx"],
+        test_cutoff=split_indices["test_cutoff"],
+    )
+
+    return PreparedData(
+        raw_frame=prepared_data.raw_frame,
+        supervised_frame=prepared_data.supervised_frame,
+        train_frame=train_frame,
+        val_frame=val_frame,
+        test_frame=test_frame,
+        feature_columns=prepared_data.feature_columns,
+        categorical_columns=prepared_data.categorical_columns,
+        geo_feature_columns=prepared_data.geo_feature_columns,
+        physics_feature_columns=prepared_data.physics_feature_columns,
+        train_cutoff=split_indices["train_cutoff"],
+        val_cutoff=split_indices["val_cutoff"],
+        val_start_idx=split_indices["val_start_idx"],
+        test_start_idx=split_indices["test_start_idx"],
+        test_cutoff=split_indices["test_cutoff"],
+    )
 
 def load_raw_frame(data_dir: Path) -> pd.DataFrame:
     frames: list[pd.DataFrame] = []
     for csv_path in sorted(data_dir.glob("*.csv")):
         frame = pd.read_csv(csv_path).rename(columns=COLUMN_MAP)
+        if "plant_id" not in frame.columns:
+            raise KeyError(f"Expected a 'plant_id' column in {csv_path.name}.")
+        frame["plant_id"] = frame["plant_id"].replace(LEGACY_PLANT_ID_MAP)
         frame["source_file"] = csv_path.name
         frames.append(frame)
     raw_frame = pd.concat(frames, ignore_index=True)
@@ -117,9 +243,14 @@ def add_metadata(frame: pd.DataFrame) -> pd.DataFrame:
     frame["site_name"] = SITE_METADATA["site_name"]
     frame["timezone_offset_hours"] = SITE_METADATA["timezone_offset_hours"]
 
-    frame["plant_name_en"] = frame["plant_id"].map(lambda value: PLANT_METADATA[value]["plant_name_en"])
-    frame["module_type"] = frame["plant_id"].map(lambda value: PLANT_METADATA[value]["module_type"])
-    frame["mounting_type"] = frame["plant_id"].map(lambda value: PLANT_METADATA[value]["mounting_type"])
+    metadata = frame["plant_id"].map(PLANT_METADATA)
+    missing_plant_ids = sorted(frame.loc[metadata.isna(), "plant_id"].astype(str).unique().tolist())
+    if missing_plant_ids:
+        raise KeyError(f"Missing plant metadata for ids: {missing_plant_ids}")
+
+    frame["plant_name_en"] = metadata.map(lambda value: value["plant_name_en"])
+    frame["module_type"] = metadata.map(lambda value: value["module_type"])
+    frame["mounting_type"] = metadata.map(lambda value: value["mounting_type"])
     return frame
 
 

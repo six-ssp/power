@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import itertools
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,8 +47,12 @@ class MetaModelResult:
     test_predictions: np.ndarray
     history: pd.DataFrame
     physics_alpha: float = 0.0
+    raw_val_predictions: np.ndarray | None = None
+    raw_test_predictions: np.ndarray | None = None
     avg_val_weights: dict[str, float] | None = None
     avg_test_weights: dict[str, float] | None = None
+    thresholds: dict[str, float] | None = None
+    regime_weights: dict[str, dict[str, dict[str, float]]] | None = None
 
 
 class MLPRegressor(nn.Module):
@@ -171,6 +176,12 @@ META_CONTEXT_COLUMNS = [
 
 META_CATEGORICAL_COLUMNS = ["plant_id", "plant_name_en", "module_type", "mounting_type"]
 
+HYBRID_SCENE_NAMES = ("night", "low_radiation", "mid_radiation", "high_radiation")
+
+
+def resolve_loader_workers(config: ExperimentConfig) -> int:
+    return 0 if os.name == "nt" else config.num_workers
+
 
 def fit_xgboost(
     train_matrix: pd.DataFrame,
@@ -217,6 +228,7 @@ def fit_dnn(
     config: ExperimentConfig,
 ) -> TabularModelResult:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    num_workers = resolve_loader_workers(config)
     scaler = StandardScaler()
     x_train = scaler.fit_transform(train_matrix).astype(np.float32)
     x_val = scaler.transform(val_matrix).astype(np.float32)
@@ -233,17 +245,17 @@ def fit_dnn(
         TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train)),
         batch_size=config.dnn_batch_size,
         shuffle=True,
-        num_workers=config.num_workers,
+        num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        persistent_workers=config.num_workers > 0,
+        persistent_workers=num_workers > 0,
     )
     val_loader = DataLoader(
         TensorDataset(torch.from_numpy(x_val), torch.from_numpy(y_val)),
         batch_size=config.dnn_batch_size,
         shuffle=False,
-        num_workers=config.num_workers,
+        num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        persistent_workers=config.num_workers > 0,
+        persistent_workers=num_workers > 0,
     )
 
     best_state = None
@@ -316,6 +328,8 @@ def fit_tft(prepared_data: PreparedData, config: ExperimentConfig) -> TFTResult:
     raw_frame = prepared_data.raw_frame.copy()
     training_frame = raw_frame[raw_frame["time_idx"] <= prepared_data.train_cutoff]
     validation_frame = raw_frame[raw_frame["time_idx"] <= prepared_data.val_cutoff]
+    test_source_frame = raw_frame[raw_frame["time_idx"] <= prepared_data.test_cutoff]
+    num_workers = resolve_loader_workers(config)
 
     training_dataset = TimeSeriesDataSet(
         training_frame,
@@ -337,14 +351,14 @@ def fit_tft(prepared_data: PreparedData, config: ExperimentConfig) -> TFTResult:
     val_dataset = TimeSeriesDataSet.from_dataset(
         training_dataset,
         validation_frame,
-        min_prediction_idx=prepared_data.train_cutoff + 1,
+        min_prediction_idx=prepared_data.val_start_idx,
         stop_randomization=True,
         predict=False,
     )
     test_dataset = TimeSeriesDataSet.from_dataset(
         training_dataset,
-        raw_frame,
-        min_prediction_idx=prepared_data.val_cutoff + 1,
+        test_source_frame,
+        min_prediction_idx=prepared_data.test_start_idx,
         stop_randomization=True,
         predict=False,
     )
@@ -352,20 +366,20 @@ def fit_tft(prepared_data: PreparedData, config: ExperimentConfig) -> TFTResult:
     train_loader = training_dataset.to_dataloader(
         train=True,
         batch_size=config.tft_batch_size,
-        num_workers=config.num_workers,
-        persistent_workers=config.num_workers > 0,
+        num_workers=num_workers,
+        persistent_workers=num_workers > 0,
     )
     val_loader = val_dataset.to_dataloader(
         train=False,
         batch_size=config.tft_batch_size * 2,
-        num_workers=config.num_workers,
-        persistent_workers=config.num_workers > 0,
+        num_workers=num_workers,
+        persistent_workers=num_workers > 0,
     )
     test_loader = test_dataset.to_dataloader(
         train=False,
         batch_size=config.tft_batch_size * 2,
-        num_workers=config.num_workers,
-        persistent_workers=config.num_workers > 0,
+        num_workers=num_workers,
+        persistent_workers=num_workers > 0,
     )
 
     logger = CSVLogger(save_dir=str(config.log_dir), name="tft")
@@ -437,14 +451,49 @@ def tune_blend_weights(
     min_weight: float,
     step: float,
 ) -> tuple[dict[str, float], np.ndarray, float]:
-    weight_grid = np.round(np.arange(min_weight, 1.0, step), 4)
+    return tune_blend_weights_with_score(
+        validation_frame,
+        prediction_columns,
+        min_weight=min_weight,
+        step=step,
+        rmse_weight=0.0,
+    )
+
+
+def compute_blend_score(
+    y_true: np.ndarray,
+    prediction: np.ndarray,
+    rmse_weight: float = 0.0,
+) -> tuple[float, float, float]:
+    mae = float(np.mean(np.abs(prediction - y_true)))
+    rmse = float(np.sqrt(np.mean(np.square(prediction - y_true))))
+    return mae + rmse_weight * rmse, mae, rmse
+
+
+def iter_simplex_weights(num_weights: int, min_weight: float, step: float) -> itertools.product:
+    if num_weights < 2:
+        raise ValueError("At least two prediction columns are required to build a blend.")
+    if step <= 0.0:
+        raise ValueError(f"Blend search step must be positive. Received step={step}.")
+    weight_grid = np.round(np.arange(min_weight, 1.0 + 1e-9, step), 4)
+    return itertools.product(weight_grid, repeat=num_weights - 1)
+
+
+def tune_blend_weights_with_score(
+    validation_frame: pd.DataFrame,
+    prediction_columns: list[str],
+    min_weight: float,
+    step: float,
+    rmse_weight: float,
+) -> tuple[dict[str, float], np.ndarray, float]:
     best_weights: dict[str, float] | None = None
     best_score = float("inf")
-    best_prediction = None
+    best_prediction: np.ndarray | None = None
+    target = validation_frame["target_power"].to_numpy(dtype=float)
 
-    for values in itertools.product(weight_grid, repeat=len(prediction_columns) - 1):
+    for values in iter_simplex_weights(len(prediction_columns), min_weight=min_weight, step=step):
         remainder = 1.0 - float(sum(values))
-        if remainder < min_weight - 1e-9:
+        if remainder < min_weight - 1e-9 or remainder > 1.0 + 1e-9:
             continue
         weights = list(values) + [remainder]
         if any(weight < min_weight - 1e-9 for weight in weights):
@@ -452,9 +501,9 @@ def tune_blend_weights(
         blended = np.zeros(len(validation_frame), dtype=float)
         for column, weight in zip(prediction_columns, weights):
             blended += validation_frame[column].to_numpy(dtype=float) * weight
-        mae = float(np.mean(np.abs(blended - validation_frame["target_power"].to_numpy(dtype=float))))
-        if mae < best_score:
-            best_score = mae
+        score, _, _ = compute_blend_score(target, blended, rmse_weight=rmse_weight)
+        if score < best_score:
+            best_score = score
             best_weights = {column: weight for column, weight in zip(prediction_columns, weights)}
             best_prediction = blended
 
@@ -471,19 +520,223 @@ def apply_physics_adjustment(frame: pd.DataFrame, prediction: np.ndarray, alpha:
     return prediction - reduction
 
 
-def tune_physics_alpha(frame: pd.DataFrame, blended_prediction: np.ndarray, config: ExperimentConfig) -> tuple[float, np.ndarray]:
+def tune_physics_alpha(
+    frame: pd.DataFrame,
+    blended_prediction: np.ndarray,
+    config: ExperimentConfig,
+    rmse_weight: float = 0.0,
+) -> tuple[float, np.ndarray]:
     best_alpha = 0.0
     best_prediction = blended_prediction.copy()
-    best_mae = float(np.mean(np.abs(blended_prediction - frame["target_power"].to_numpy(dtype=float))))
+    target = frame["target_power"].to_numpy(dtype=float)
+    best_score, _, _ = compute_blend_score(target, blended_prediction, rmse_weight=rmse_weight)
 
     for alpha in config.night_alpha_grid:
         candidate = apply_physics_adjustment(frame, blended_prediction, alpha, config.night_radiation_threshold)
-        mae = float(np.mean(np.abs(candidate - frame["target_power"].to_numpy(dtype=float))))
-        if mae < best_mae:
+        score, _, _ = compute_blend_score(target, candidate, rmse_weight=rmse_weight)
+        if score < best_score:
             best_alpha = alpha
             best_prediction = candidate
-            best_mae = mae
+            best_score = score
     return best_alpha, best_prediction
+
+
+def build_scene_masks(
+    frame: pd.DataFrame,
+    low_radiation_threshold: float,
+    high_radiation_threshold: float,
+) -> dict[str, pd.Series]:
+    if high_radiation_threshold <= low_radiation_threshold:
+        raise ValueError(
+            "high_radiation_threshold must be larger than low_radiation_threshold. "
+            f"Received low={low_radiation_threshold}, high={high_radiation_threshold}."
+        )
+
+    night_mask = frame["forecast_night_flag"] == 1
+    low_mask = (frame["forecast_night_flag"] == 0) & (frame["forecast_global_radiation"] < low_radiation_threshold)
+    mid_mask = (frame["forecast_global_radiation"] >= low_radiation_threshold) & (
+        frame["forecast_global_radiation"] < high_radiation_threshold
+    )
+    high_mask = frame["forecast_global_radiation"] >= high_radiation_threshold
+    return {
+        "night": night_mask,
+        "low_radiation": low_mask,
+        "mid_radiation": mid_mask,
+        "high_radiation": high_mask,
+    }
+
+
+def apply_scene_hybrid(
+    frame: pd.DataFrame,
+    prediction_columns: list[str],
+    regime_weights: dict[str, dict[str, dict[str, float]]],
+    low_radiation_threshold: float,
+    high_radiation_threshold: float,
+    plant_specific: bool,
+) -> np.ndarray:
+    blended = np.zeros(len(frame), dtype=float)
+    scope_key = "__global__"
+
+    for plant_id, plant_frame in frame.groupby("plant_id", sort=False):
+        plant_key = plant_id if plant_specific else scope_key
+        if plant_key not in regime_weights:
+            raise KeyError(f"Missing scene-aware hybrid weights for key '{plant_key}'.")
+        masks = build_scene_masks(plant_frame, low_radiation_threshold, high_radiation_threshold)
+        for scene_name, scene_mask in masks.items():
+            scene_index = plant_frame.index[scene_mask.to_numpy()]
+            if len(scene_index) == 0:
+                continue
+            scene_weights = regime_weights[plant_key][scene_name]
+            weight_vector = np.array([scene_weights[column] for column in prediction_columns], dtype=float)
+            blended[scene_index] = frame.loc[scene_index, prediction_columns].to_numpy(dtype=float) @ weight_vector
+
+    return blended
+
+
+def fit_scene_aware_hybrid(
+    validation_frame: pd.DataFrame,
+    test_frame: pd.DataFrame,
+    prediction_columns: list[str],
+    config: ExperimentConfig,
+    plant_specific: bool = True,
+) -> MetaModelResult:
+    meta_train_frame, meta_holdout_frame = split_meta_validation_frame(validation_frame, config.meta_train_ratio)
+    scope_keys = sorted(validation_frame["plant_id"].unique()) if plant_specific else ["__global__"]
+    history_rows: list[dict[str, float | str]] = []
+    best_candidate: dict[str, object] | None = None
+
+    for low_threshold in config.hybrid_low_radiation_candidates:
+        for high_threshold in config.hybrid_high_radiation_candidates:
+            if high_threshold <= low_threshold:
+                continue
+
+            candidate_weights: dict[str, dict[str, dict[str, float]]] = {}
+            valid_candidate = True
+            for scope_key in scope_keys:
+                scope_frame = meta_train_frame if not plant_specific else meta_train_frame[meta_train_frame["plant_id"] == scope_key]
+                candidate_weights[scope_key] = {}
+                for scene_name, scene_mask in build_scene_masks(scope_frame, low_threshold, high_threshold).items():
+                    scene_frame = scope_frame[scene_mask].copy()
+                    if scene_frame.empty:
+                        valid_candidate = False
+                        break
+                    scene_weights, _, _ = tune_blend_weights_with_score(
+                        scene_frame,
+                        prediction_columns,
+                        min_weight=config.hybrid_min_weight,
+                        step=config.hybrid_weight_step,
+                        rmse_weight=config.hybrid_rmse_weight,
+                    )
+                    candidate_weights[scope_key][scene_name] = scene_weights
+                if not valid_candidate:
+                    break
+
+            if not valid_candidate:
+                continue
+
+            holdout_raw = apply_scene_hybrid(
+                meta_holdout_frame,
+                prediction_columns,
+                candidate_weights,
+                low_radiation_threshold=low_threshold,
+                high_radiation_threshold=high_threshold,
+                plant_specific=plant_specific,
+            )
+            holdout_alpha, holdout_prediction = tune_physics_alpha(
+                meta_holdout_frame,
+                holdout_raw,
+                config,
+                rmse_weight=config.hybrid_rmse_weight,
+            )
+            holdout_score, holdout_mae, holdout_rmse = compute_blend_score(
+                meta_holdout_frame["target_power"].to_numpy(dtype=float),
+                holdout_prediction,
+                rmse_weight=config.hybrid_rmse_weight,
+            )
+            history_rows.append(
+                {
+                    "low_radiation_threshold": low_threshold,
+                    "high_radiation_threshold": high_threshold,
+                    "holdout_score": holdout_score,
+                    "holdout_mae": holdout_mae,
+                    "holdout_rmse": holdout_rmse,
+                    "holdout_alpha": holdout_alpha,
+                    "plant_specific": int(plant_specific),
+                }
+            )
+            if best_candidate is None or holdout_score < float(best_candidate["holdout_score"]):
+                best_candidate = {
+                    "low_threshold": low_threshold,
+                    "high_threshold": high_threshold,
+                    "holdout_score": holdout_score,
+                }
+
+    if best_candidate is None:
+        raise RuntimeError("Scene-aware hybrid failed to find a valid threshold configuration.")
+
+    final_weights: dict[str, dict[str, dict[str, float]]] = {}
+    for scope_key in scope_keys:
+        scope_frame = validation_frame if not plant_specific else validation_frame[validation_frame["plant_id"] == scope_key]
+        final_weights[scope_key] = {}
+        for scene_name, scene_mask in build_scene_masks(
+            scope_frame,
+            float(best_candidate["low_threshold"]),
+            float(best_candidate["high_threshold"]),
+        ).items():
+            scene_frame = scope_frame[scene_mask].copy()
+            scene_weights, _, _ = tune_blend_weights_with_score(
+                scene_frame,
+                prediction_columns,
+                min_weight=config.hybrid_min_weight,
+                step=config.hybrid_weight_step,
+                rmse_weight=config.hybrid_rmse_weight,
+            )
+            final_weights[scope_key][scene_name] = scene_weights
+
+    raw_val_prediction = apply_scene_hybrid(
+        validation_frame,
+        prediction_columns,
+        final_weights,
+        low_radiation_threshold=float(best_candidate["low_threshold"]),
+        high_radiation_threshold=float(best_candidate["high_threshold"]),
+        plant_specific=plant_specific,
+    )
+    physics_alpha, val_prediction = tune_physics_alpha(
+        validation_frame,
+        raw_val_prediction,
+        config,
+        rmse_weight=config.hybrid_rmse_weight,
+    )
+
+    raw_test_prediction = apply_scene_hybrid(
+        test_frame,
+        prediction_columns,
+        final_weights,
+        low_radiation_threshold=float(best_candidate["low_threshold"]),
+        high_radiation_threshold=float(best_candidate["high_threshold"]),
+        plant_specific=plant_specific,
+    )
+    test_prediction = apply_physics_adjustment(
+        test_frame,
+        raw_test_prediction,
+        physics_alpha,
+        config.night_radiation_threshold,
+    )
+
+    return MetaModelResult(
+        model_name="hybrid",
+        val_predictions=val_prediction,
+        test_predictions=test_prediction,
+        history=pd.DataFrame(history_rows),
+        physics_alpha=physics_alpha,
+        raw_val_predictions=raw_val_prediction,
+        raw_test_predictions=raw_test_prediction,
+        thresholds={
+            "low_radiation": float(best_candidate["low_threshold"]),
+            "high_radiation": float(best_candidate["high_threshold"]),
+        },
+        regime_weights=final_weights,
+    )
 
 
 def split_meta_validation_frame(frame: pd.DataFrame, train_ratio: float) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -640,6 +893,7 @@ def fit_adaptive_blend(
     config: ExperimentConfig,
 ) -> MetaModelResult:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    num_workers = resolve_loader_workers(config)
     meta_train_frame, meta_holdout_frame = split_meta_validation_frame(validation_frame, config.meta_train_ratio)
     train_matrix, holdout_matrix, val_matrix, test_matrix = build_meta_design_matrices(
         meta_train_frame,
@@ -680,9 +934,9 @@ def fit_adaptive_blend(
         ),
         batch_size=config.adaptive_batch_size,
         shuffle=True,
-        num_workers=config.num_workers,
+        num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        persistent_workers=config.num_workers > 0,
+        persistent_workers=num_workers > 0,
     )
     holdout_loader = DataLoader(
         TensorDataset(
@@ -692,9 +946,9 @@ def fit_adaptive_blend(
         ),
         batch_size=config.adaptive_batch_size,
         shuffle=False,
-        num_workers=config.num_workers,
+        num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
-        persistent_workers=config.num_workers > 0,
+        persistent_workers=num_workers > 0,
     )
 
     best_state = None

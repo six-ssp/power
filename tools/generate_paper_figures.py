@@ -52,6 +52,10 @@ def plot_baseline_overview(baseline: pd.DataFrame, output: Path) -> None:
     plt.close(figure)
 
 
+def plot_daytime_overview(daytime_baseline: pd.DataFrame, output: Path) -> None:
+    plot_baseline_overview(daytime_baseline, output)
+
+
 def plot_ablation_overview(ablation: pd.DataFrame, output: Path) -> None:
     figure, axes = plt.subplots(1, 2, figsize=(13, 4.5))
     for axis, metric in zip(axes, ["MAE", "RMSE"]):
@@ -260,6 +264,53 @@ def plot_gain_by_plant(plant_table: pd.DataFrame, output: Path) -> None:
     plt.close(figure)
 
 
+def plot_seed_stability(seed_summary: pd.DataFrame, output: Path) -> None:
+    focus_models = ["DNN", "TFT", "Hybrid", "AdaptiveBlend", "StackedXGB"]
+    plot_frame = seed_summary[seed_summary["Model"].isin(focus_models)].copy()
+
+    figure, axes = plt.subplots(1, 2, figsize=(12, 4.6))
+    for axis, metric in zip(axes, ["MAE", "RMSE"]):
+        axis.bar(
+            plot_frame["Model"],
+            plot_frame[f"{metric}_mean"],
+            yerr=plot_frame[f"{metric}_std"],
+            capsize=4,
+            color=[COLORS.get(name, "#4c78a8") for name in plot_frame["Model"]],
+        )
+        axis.set_title(f"Seed Stability: {metric}")
+        axis.tick_params(axis="x", rotation=22)
+        axis.grid(axis="y", alpha=0.2)
+    figure.tight_layout()
+    figure.savefig(output, dpi=220, bbox_inches="tight")
+    plt.close(figure)
+
+
+def plot_rolling_origin_overview(rolling_metrics: pd.DataFrame, output: Path) -> None:
+    focus_models = ["TFT", "Hybrid", "StackedXGB"]
+    figure, axes = plt.subplots(1, 2, figsize=(12.5, 4.8))
+
+    for axis, metric in zip(axes, ["MAE", "RMSE"]):
+        for model_name in focus_models:
+            model_frame = rolling_metrics[rolling_metrics["Model"] == model_name].copy()
+            axis.plot(
+                model_frame["Window"],
+                model_frame[metric],
+                marker="o",
+                linewidth=1.8,
+                markersize=4,
+                label=model_name,
+                color=COLORS[model_name],
+            )
+        axis.set_title(f"Rolling-Origin {metric}")
+        axis.set_xlabel("Window")
+        axis.set_ylabel(metric)
+        axis.grid(alpha=0.25)
+    axes[1].legend()
+    figure.tight_layout()
+    figure.savefig(output, dpi=220, bbox_inches="tight")
+    plt.close(figure)
+
+
 def plot_method_framework(output: Path) -> None:
     figure, axis = plt.subplots(figsize=(12, 6))
     axis.set_xlim(0, 1)
@@ -320,31 +371,40 @@ def write_catalog(output: Path) -> None:
             "## 图1 baseline_overview.png",
             "- Baseline 模型在 MAE / RMSE / R2 上的总体比较。",
             "",
-            "## 图2 ablation_overview.png",
+            "## 图2 daytime_baseline_overview.png",
+            "- Daytime-only 子集上的总体比较。",
+            "",
+            "## 图3 ablation_overview.png",
             "- 完整模型与各消融设置在 MAE / RMSE 上的比较。",
             "",
-            "## 图3 plant_mae_heatmap.png",
+            "## 图4 plant_mae_heatmap.png",
             "- 不同电站与不同模型的 MAE 热力图。",
             "",
-            "## 图4 plant_rmse_heatmap.png",
+            "## 图5 plant_rmse_heatmap.png",
             "- 不同电站与不同模型的 RMSE 热力图。",
             "",
-            "## 图5 relative_improvement.png",
+            "## 图6 relative_improvement.png",
             "- 各模型相对 Persistence 的 MAE 提升比例。",
             "",
-            "## 图6 scatter_comparison.png",
+            "## 图7 scatter_comparison.png",
             "- TFT 与 StackedXGB 的真实值-预测值散点拟合图。",
             "",
-            "## 图7 residual_distribution.png",
+            "## 图8 residual_distribution.png",
             "- 主要模型残差分布与残差标准差比较。",
             "",
-            "## 图8 hourly_mae_curve.png",
+            "## 图9 hourly_mae_curve.png",
             "- 不同小时段的 MAE 曲线，可用于说明场景差异。",
             "",
-            "## 图9 plant_gain_over_tft.png",
+            "## 图10 plant_gain_over_tft.png",
             "- AdaptiveBlend / StackedXGB 相对 TFT 的分电站收益。",
             "",
-            "## 图10 method_framework.png",
+            "## 图11 seed_stability.png",
+            "- 多随机种子重复下 MAE / RMSE 的均值和标准差。",
+            "",
+            "## 图12 rolling_origin_overview.png",
+            "- rolling-origin 各窗口下 TFT / Hybrid / StackedXGB 的指标曲线。",
+            "",
+            "## 图13 method_framework.png",
             "- 方法框架图，可直接放到论文方法部分。",
             "",
             "## 已有图复用建议",
@@ -363,11 +423,15 @@ def main() -> None:
     paper_dir.mkdir(parents=True, exist_ok=True)
 
     baseline = pd.read_csv(metrics_dir / "baseline_metrics.csv")
+    baseline_daytime = pd.read_csv(metrics_dir / "baseline_daytime_metrics.csv")
     ablation = pd.read_csv(metrics_dir / "ablation_metrics.csv")
     plant_table = pd.read_csv(metrics_dir / "plant_level_metrics.csv")
+    seed_summary = pd.read_csv(metrics_dir / "seed_repeat_summary.csv")
+    rolling_metrics = pd.read_csv(metrics_dir / "rolling_origin_metrics.csv")
     test_predictions = pd.read_csv(metrics_dir / "test_predictions.csv")
 
     plot_baseline_overview(baseline, paper_dir / "baseline_overview.png")
+    plot_daytime_overview(baseline_daytime, paper_dir / "daytime_baseline_overview.png")
     plot_ablation_overview(ablation, paper_dir / "ablation_overview.png")
     plot_plant_heatmap(plant_table, "MAE", paper_dir / "plant_mae_heatmap.png")
     plot_plant_heatmap(plant_table, "RMSE", paper_dir / "plant_rmse_heatmap.png")
@@ -376,6 +440,8 @@ def main() -> None:
     plot_residual_distribution(test_predictions, paper_dir / "residual_distribution.png")
     plot_hourly_mae_curve(test_predictions, paper_dir / "hourly_mae_curve.png")
     plot_gain_by_plant(plant_table, paper_dir / "plant_gain_over_tft.png")
+    plot_seed_stability(seed_summary, paper_dir / "seed_stability.png")
+    plot_rolling_origin_overview(rolling_metrics, paper_dir / "rolling_origin_overview.png")
     plot_method_framework(paper_dir / "method_framework.png")
     write_catalog(paper_dir / "paper_figure_catalog_zh.md")
     print("saved", paper_dir)

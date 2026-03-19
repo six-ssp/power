@@ -1,8 +1,13 @@
 ﻿name,value
-full_blend_weights,"{'xgboost_prediction': 0.7, 'dnn_prediction': 0.2, 'tft_prediction': 0.10000000000000009}"
-full_physics_alpha,0.600000
-equal_weight_physics_alpha,0.600000
-adaptive_blend_avg_val_weights,"{'persistence_prediction': 0.1632891446352005, 'xgboost_prediction': 0.24613110721111298, 'dnn_prediction': 0.2304449826478958, 'tft_prediction': 0.3601384162902832}"
-adaptive_blend_avg_test_weights,"{'persistence_prediction': 0.17404016852378845, 'xgboost_prediction': 0.25216618180274963, 'dnn_prediction': 0.21423447132110596, 'tft_prediction': 0.3595584034919739}"
+hybrid_thresholds,"{'low_radiation': 200.0, 'high_radiation': 700.0}"
+hybrid_regime_weights,"{'AliceSprings_HighEfficiency_4A': {'night': {'xgboost_prediction': 0.4, 'dnn_prediction': 0.05, 'tft_prediction': 0.55}, 'low_radiation': {'xgboost_prediction': 0.0, 'dnn_prediction': 1.0, 'tft_prediction': 0.0}, 'mid_radiation': {'xgboost_prediction': 0.0, 'dnn_prediction': 0.45, 'tft_prediction': 0.55}, 'high_radiation': {'xgboost_prediction': 0.0, 'dnn_prediction': 0.45, 'tft_prediction': 0.55}}, 'AliceSprings_MonoTrack_1A': {'night': {'xgboost_prediction': 0.2, 'dnn_prediction': 0.05, 'tft_prediction': 0.75}, 'low_radiation': {'xgboost_prediction': 0.5, 'dnn_prediction': 0.5, 'tft_prediction': 0.0}, 'mid_radiation': {'xgboost_prediction': 0.0, 'dnn_prediction': 0.15, 'tft_prediction': 0.85}, 'high_radiation': {'xgboost_prediction': 0.1, 'dnn_prediction': 0.05, 'tft_prediction': 0.85}}, 'AliceSprings_PolyFixed_1C': {'night': {'xgboost_prediction': 0.15, 'dnn_prediction': 0.0, 'tft_prediction': 0.85}, 'low_radiation': {'xgboost_prediction': 0.45, 'dnn_prediction': 0.55, 'tft_prediction': 0.0}, 'mid_radiation': {'xgboost_prediction': 0.05, 'dnn_prediction': 0.15, 'tft_prediction': 0.8}, 'high_radiation': {'xgboost_prediction': 0.0, 'dnn_prediction': 0.3, 'tft_prediction': 0.7}}, 'AliceSprings_PolyUtility_3A': {'night': {'xgboost_prediction': 0.4, 'dnn_prediction': 0.1, 'tft_prediction': 0.5}, 'low_radiation': {'xgboost_prediction': 0.0, 'dnn_prediction': 1.0, 'tft_prediction': 0.0}, 'mid_radiation': {'xgboost_prediction': 0.0, 'dnn_prediction': 0.1, 'tft_prediction': 0.9}, 'high_radiation': {'xgboost_prediction': 0.2, 'dnn_prediction': 0.15, 'tft_prediction': 0.65}}}"
+hybrid_physics_alpha,0.600000
+adaptive_blend_avg_val_weights,"{'persistence_prediction': 0.17082549631595612, 'xgboost_prediction': 0.25222358107566833, 'dnn_prediction': 0.22373583912849426, 'tft_prediction': 0.3532140552997589}"
+adaptive_blend_avg_test_weights,"{'persistence_prediction': 0.10850607603788376, 'xgboost_prediction': 0.29500097036361694, 'dnn_prediction': 0.2972310483455658, 'tft_prediction': 0.2992614507675171}"
 adaptive_blend_physics_alpha,0.600000
 stacked_xgboost_physics_alpha,0.600000
+hybrid_without_plant_thresholds,"{'low_radiation': 200.0, 'high_radiation': 600.0}"
+hybrid_without_plant_regime_weights,"{'__global__': {'night': {'xgboost_prediction': 0.45, 'dnn_prediction': 0.25, 'tft_prediction': 0.30000000000000004}, 'low_radiation': {'xgboost_prediction': 0.0, 'dnn_prediction': 1.0, 'tft_prediction': 0.0}, 'mid_radiation': {'xgboost_prediction': 0.0, 'dnn_prediction': 0.3, 'tft_prediction': 0.7}, 'high_radiation': {'xgboost_prediction': 0.0, 'dnn_prediction': 0.3, 'tft_prediction': 0.7}}}"
+hybrid_without_plant_physics_alpha,0.600000
+hybrid_without_scene_weights,"{'xgboost_prediction': 0.45, 'dnn_prediction': 0.45, 'tft_prediction': 0.09999999999999998}"
+hybrid_without_scene_physics_alpha,0.600000
