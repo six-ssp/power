@@ -186,15 +186,6 @@ The ablation indicates that scene adaptation is the main source of improvement, 
 | `artifacts/reports/` | Chinese training log, result summary, method story, robustness summary |
 | `artifacts/checks/` | project verification outputs |
 
-Useful files for paper writing:
-
-- `artifacts/reports/result_summary_zh.md`
-- `artifacts/reports/robustness_summary_zh.md`
-- `artifacts/metrics/baseline_metrics.csv`
-- `artifacts/metrics/baseline_daytime_metrics.csv`
-- `artifacts/metrics/seed_repeat_summary.csv`
-- `artifacts/metrics/rolling_origin_summary.csv`
-
 ## Reproducibility Notes
 
 - Verified environment: `Python 3.12`, CUDA available, GPU PyTorch runtime
