@@ -51,6 +51,22 @@ All dataset files in this repository use English column names:
 
 The current task formulation assumes the next-step weather is available and performs conditional regression for the next-step power output. This is an explicit task definition in the repository, not an accidental information leak.
 
+## Dataset Release
+
+The original CSV files are not stored directly in Git history. GitHub contains compressed split parts in `dataset_parts/`, together with restore scripts.
+
+Restore the raw dataset locally:
+
+```powershell
+.\.venv\Scripts\python tools\merge_dataset_parts.py --overwrite
+```
+
+Rebuild split parts from local raw CSV files:
+
+```powershell
+.\.venv\Scripts\python tools\split_dataset_parts.py
+```
+
 ## Evaluation Protocol
 
 | Component | Setting |
