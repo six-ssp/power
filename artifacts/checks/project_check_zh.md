@@ -12,7 +12,7 @@
 - 主实验入口、配置、数据处理、模型与报告模块均存在。
 - `baseline_metrics.csv / ablation_metrics.csv / plant_level_metrics.csv` 已生成。
 - `baseline_daytime_metrics.csv / seed_repeat_summary.csv / rolling_origin_summary.csv` 已生成。
-- `README.md`、中文训练记录、论文大纲、方法说明、鲁棒性记录和主要图表已经生成。
+- `README.md`、训练配置记录、SDM 口径说明、参考稿、鲁棒性记录和主要图表已经生成。
 - 代码可完成数据加载、特征工程与监督样本构建。
 
 ## 3. 可复现性说明
@@ -26,6 +26,7 @@
 - 新版 Hybrid 已改为电站级场景融合，并额外保留固定权重版本作为消融对照。
 - StackedXGB 仍是重要对照，但主线 Hybrid 现在具备更强的可解释性。
 - 项目现在额外提供 daytime-only、多随机种子和 rolling-origin 三类评估结果。
+- 训练配置与实际执行轮次已导出为独立表格，可直接写入论文实验设置。
 
 ## 5. 数据与特征规模
 - 原始样本：`1242372` 行，`40` 列

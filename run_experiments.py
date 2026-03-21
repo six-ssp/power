@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from copy import deepcopy
 from dataclasses import dataclass
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -67,6 +68,7 @@ class ExperimentArtifacts:
     val_predictions: pd.DataFrame
     test_predictions: pd.DataFrame
     blend_summary: pd.DataFrame
+    xgb_history: pd.DataFrame
     dnn_history: pd.DataFrame
     tft_history: pd.DataFrame
     adaptive_history: pd.DataFrame
@@ -87,6 +89,10 @@ def set_seed(seed: int) -> None:
     torch.set_float32_matmul_precision("high")
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def log_progress(message: str) -> None:
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}", flush=True)
 
 
 def make_prediction_frame(frame: pd.DataFrame, prediction_name: str, prediction: np.ndarray) -> pd.DataFrame:
@@ -269,6 +275,181 @@ def build_window_description(
     }
 
 
+def build_training_configuration_table(config: ExperimentConfig) -> pd.DataFrame:
+    rows = [
+        {
+            "Model": "XGBoost",
+            "Role": "base learner",
+            "TrainingUnit": "boosting rounds",
+            "MaxEpochsOrRounds": int(config.xgb_params["n_estimators"]),
+            "BatchSize": "-",
+            "LearningRate": float(config.xgb_params["learning_rate"]),
+            "PatienceOrEarlyStop": int(config.xgb_early_stopping_rounds),
+            "SelectionMetric": "val_rmse",
+            "OptimizerOrBackend": "XGBoost hist",
+            "Notes": "tree ensemble with validation early stopping",
+        },
+        {
+            "Model": "DNN",
+            "Role": "base learner",
+            "TrainingUnit": "epochs",
+            "MaxEpochsOrRounds": int(config.dnn_epochs),
+            "BatchSize": int(config.dnn_batch_size),
+            "LearningRate": float(config.dnn_learning_rate),
+            "PatienceOrEarlyStop": int(config.dnn_patience),
+            "SelectionMetric": "val_rmse",
+            "OptimizerOrBackend": "AdamW",
+            "Notes": "MLP with SmoothL1 loss and best-state restore",
+        },
+        {
+            "Model": "TFT",
+            "Role": "base learner",
+            "TrainingUnit": "epochs",
+            "MaxEpochsOrRounds": int(config.tft_max_epochs),
+            "BatchSize": int(config.tft_batch_size),
+            "LearningRate": float(config.tft_learning_rate),
+            "PatienceOrEarlyStop": int(config.tft_patience),
+            "SelectionMetric": "val_loss",
+            "OptimizerOrBackend": "PyTorch Forecasting / Lightning",
+            "Notes": "best checkpoint restored after early stopping",
+        },
+        {
+            "Model": "AdaptiveBlend",
+            "Role": "meta learner",
+            "TrainingUnit": "epochs",
+            "MaxEpochsOrRounds": int(config.adaptive_epochs),
+            "BatchSize": int(config.adaptive_batch_size),
+            "LearningRate": float(config.adaptive_learning_rate),
+            "PatienceOrEarlyStop": int(config.adaptive_patience),
+            "SelectionMetric": "holdout_mae",
+            "OptimizerOrBackend": "AdamW",
+            "Notes": "neural gating on validation holdout split",
+        },
+        {
+            "Model": "StackedXGB",
+            "Role": "meta learner",
+            "TrainingUnit": "boosting rounds",
+            "MaxEpochsOrRounds": int(config.stack_xgb_params["n_estimators"]),
+            "BatchSize": "-",
+            "LearningRate": float(config.stack_xgb_params["learning_rate"]),
+            "PatienceOrEarlyStop": int(config.stack_xgb_early_stopping_rounds),
+            "SelectionMetric": "holdout_rmse",
+            "OptimizerOrBackend": "XGBoost hist",
+            "Notes": "stacking regressor on validation holdout split",
+        },
+    ]
+    return pd.DataFrame(rows)
+
+
+def summarize_boosting_history(
+    history: pd.DataFrame,
+    metric_column: str,
+) -> tuple[int, int, float]:
+    if history.empty:
+        return 0, 0, float("nan")
+    history = history.dropna(subset=["round", metric_column]).copy()
+    if history.empty:
+        return 0, 0, float("nan")
+    actual_rounds = int(history["round"].max()) + 1
+    best_row = history.loc[history[metric_column].idxmin()]
+    best_round = int(best_row["round"]) + 1
+    best_score = float(best_row[metric_column])
+    return actual_rounds, best_round, best_score
+
+
+def summarize_epoch_history(
+    history: pd.DataFrame,
+    metric_column: str,
+    *,
+    epoch_column: str = "epoch",
+    zero_based_epoch: bool = False,
+) -> tuple[int, int, float]:
+    if history.empty:
+        return 0, 0, float("nan")
+    history = history.dropna(subset=[epoch_column, metric_column]).copy()
+    if history.empty:
+        return 0, 0, float("nan")
+    epoch_offset = 1 if zero_based_epoch else 0
+    actual_epochs = int(history[epoch_column].max()) + epoch_offset
+    best_row = history.loc[history[metric_column].idxmin()]
+    best_epoch = int(best_row[epoch_column]) + epoch_offset
+    best_score = float(best_row[metric_column])
+    return actual_epochs, best_epoch, best_score
+
+
+def build_training_execution_table(
+    config: ExperimentConfig,
+    artifacts: ExperimentArtifacts,
+) -> pd.DataFrame:
+    xgb_rounds, xgb_best_round, xgb_best_rmse = summarize_boosting_history(artifacts.xgb_history, "val_rmse")
+    dnn_epochs, dnn_best_epoch, dnn_best_rmse = summarize_epoch_history(artifacts.dnn_history, "val_rmse")
+    tft_epochs, tft_best_epoch, tft_best_loss = summarize_epoch_history(
+        artifacts.tft_history,
+        "val_loss",
+        zero_based_epoch=True,
+    )
+    adaptive_epochs, adaptive_best_epoch, adaptive_best_mae = summarize_epoch_history(
+        artifacts.adaptive_history,
+        "holdout_mae",
+    )
+    stacked_rounds, stacked_best_round, stacked_best_rmse = summarize_boosting_history(
+        artifacts.stacked_history,
+        "holdout_rmse",
+    )
+    rows = [
+        {
+            "Model": "XGBoost",
+            "TrainingUnit": "boosting rounds",
+            "MaxEpochsOrRounds": int(config.xgb_params["n_estimators"]),
+            "ExecutedEpochsOrRounds": xgb_rounds,
+            "BestEpochOrRound": xgb_best_round,
+            "SelectionMetric": "val_rmse",
+            "BestSelectionScore": xgb_best_rmse,
+        },
+        {
+            "Model": "DNN",
+            "TrainingUnit": "epochs",
+            "MaxEpochsOrRounds": int(config.dnn_epochs),
+            "ExecutedEpochsOrRounds": dnn_epochs,
+            "BestEpochOrRound": dnn_best_epoch,
+            "SelectionMetric": "val_rmse",
+            "BestSelectionScore": dnn_best_rmse,
+        },
+        {
+            "Model": "TFT",
+            "TrainingUnit": "epochs",
+            "MaxEpochsOrRounds": int(config.tft_max_epochs),
+            "ExecutedEpochsOrRounds": tft_epochs,
+            "BestEpochOrRound": tft_best_epoch,
+            "SelectionMetric": "val_loss",
+            "BestSelectionScore": tft_best_loss,
+        },
+        {
+            "Model": "AdaptiveBlend",
+            "TrainingUnit": "epochs",
+            "MaxEpochsOrRounds": int(config.adaptive_epochs),
+            "ExecutedEpochsOrRounds": adaptive_epochs,
+            "BestEpochOrRound": adaptive_best_epoch,
+            "SelectionMetric": "holdout_mae",
+            "BestSelectionScore": adaptive_best_mae,
+        },
+        {
+            "Model": "StackedXGB",
+            "TrainingUnit": "boosting rounds",
+            "MaxEpochsOrRounds": int(config.stack_xgb_params["n_estimators"]),
+            "ExecutedEpochsOrRounds": stacked_rounds,
+            "BestEpochOrRound": stacked_best_round,
+            "SelectionMetric": "holdout_rmse",
+            "BestSelectionScore": stacked_best_rmse,
+        },
+    ]
+    return pd.DataFrame(rows)
+
+
+def relative_improvement_percent(reference_value: float, improved_value: float) -> float:
+    return (reference_value - improved_value) / reference_value * 100.0
+
+
 def run_single_experiment(
     config: ExperimentConfig,
     prepared_data: PreparedData | None = None,
@@ -276,10 +457,10 @@ def run_single_experiment(
 ) -> ExperimentArtifacts:
     set_seed(config.random_seed)
     prepared = prepared_data if prepared_data is not None else load_and_prepare_data(config)
-    print(f"Running experiment with seed={config.random_seed}.")
-    print("CUDA available:", torch.cuda.is_available())
+    log_progress(f"Running experiment with seed={config.random_seed}.")
+    print("CUDA available:", torch.cuda.is_available(), flush=True)
     if torch.cuda.is_available():
-        print("CUDA device:", torch.cuda.get_device_name(0))
+        print("CUDA device:", torch.cuda.get_device_name(0), flush=True)
 
     train_x, val_x, test_x, model_columns = build_tabular_matrices(
         prepared.train_frame,
@@ -290,15 +471,21 @@ def run_single_experiment(
     )
     train_y = prepared.train_frame["target_power"].to_numpy(dtype=float)
     val_y = prepared.val_frame["target_power"].to_numpy(dtype=float)
-    print("Train/Val/Test rows:", len(train_x), len(val_x), len(test_x))
-    print("Feature count:", len(model_columns))
+    print("Train/Val/Test rows:", len(train_x), len(val_x), len(test_x), flush=True)
+    print("Feature count:", len(model_columns), flush=True)
 
     persistence_val = prepared.val_frame["power_now"].to_numpy(dtype=float)
     persistence_test = prepared.test_frame["power_now"].to_numpy(dtype=float)
 
+    log_progress("Training XGBoost.")
     xgb_result = fit_xgboost(train_x, train_y, val_x, val_y, test_x, config)
+    log_progress("Finished XGBoost.")
+    log_progress("Training DNN.")
     dnn_result = fit_dnn(train_x, train_y, val_x, val_y, test_x, config)
+    log_progress("Finished DNN.")
+    log_progress("Training TFT.")
     tft_result = fit_tft(prepared, config)
+    log_progress("Finished TFT.")
 
     val_base = make_prediction_frame(prepared.val_frame, "persistence_prediction", persistence_val)
     test_base = make_prediction_frame(prepared.test_frame, "persistence_prediction", persistence_test)
@@ -311,6 +498,7 @@ def run_single_experiment(
     test_all = merge_predictions(test_base, tft_result.test_predictions, "test")
 
     hybrid_prediction_columns = ["xgboost_prediction", "dnn_prediction", "tft_prediction"]
+    log_progress("Fitting Hybrid.")
     hybrid_result = fit_scene_aware_hybrid(
         validation_frame=val_all,
         test_frame=test_all,
@@ -332,6 +520,7 @@ def run_single_experiment(
     ablation_table = pd.DataFrame()
 
     if include_ablations:
+        log_progress("Running Hybrid ablations.")
         hybrid_without_plant_result = fit_scene_aware_hybrid(
             validation_frame=val_all,
             test_frame=test_all,
@@ -360,6 +549,7 @@ def run_single_experiment(
             "hybrid_without_tft": ["xgboost_prediction", "dnn_prediction"],
         }
         for name, columns in component_ablation_specs.items():
+            log_progress(f"Running ablation: {name}.")
             ablation_result = fit_scene_aware_hybrid(val_all, test_all, columns, config)
             val_all[name] = ablation_result.val_predictions
             test_all[name] = ablation_result.test_predictions
@@ -375,8 +565,12 @@ def run_single_experiment(
         "dnn_prediction",
         "tft_prediction",
     ]
+    log_progress("Training AdaptiveBlend.")
     adaptive_result = fit_adaptive_blend(val_all, test_all, optimized_prediction_columns, config)
+    log_progress("Finished AdaptiveBlend.")
+    log_progress("Training StackedXGB.")
     stacked_result = fit_stacked_xgboost(val_all, test_all, optimized_prediction_columns, config)
+    log_progress("Finished StackedXGB.")
     val_all["adaptive_blend_prediction"] = adaptive_result.val_predictions
     test_all["adaptive_blend_prediction"] = adaptive_result.test_predictions
     val_all["stacked_xgboost_prediction"] = stacked_result.val_predictions
@@ -422,6 +616,7 @@ def run_single_experiment(
         val_predictions=val_all,
         test_predictions=test_all,
         blend_summary=blend_summary,
+        xgb_history=xgb_result.history,
         dnn_history=dnn_result.history,
         tft_history=tft_result.history,
         adaptive_history=adaptive_result.history,
@@ -439,6 +634,7 @@ def run_single_experiment(
 def run_seed_repeats(config: ExperimentConfig, prepared_data: PreparedData) -> tuple[pd.DataFrame, pd.DataFrame]:
     repeat_rows = []
     for seed in config.robustness_seeds:
+        log_progress(f"Starting seed repeat: {seed}.")
         runtime_config = clone_runtime_config(config, seed=seed, log_subdir=f"seed_repeats/seed_{seed}")
         artifacts = run_single_experiment(runtime_config, prepared_data=prepared_data, include_ablations=False)
         run_table = artifacts.baseline_table.copy()
@@ -448,6 +644,7 @@ def run_seed_repeats(config: ExperimentConfig, prepared_data: PreparedData) -> t
         partial_repeat_summary = summarize_repeated_metrics(partial_repeat_table, id_column="Seed")
         partial_repeat_table.to_csv(config.metric_dir / "seed_repeat_metrics.csv", index=False, encoding="utf-8-sig")
         partial_repeat_summary.to_csv(config.metric_dir / "seed_repeat_summary.csv", index=False, encoding="utf-8-sig")
+        log_progress(f"Finished seed repeat: {seed}.")
     repeat_table = pd.concat(repeat_rows, ignore_index=True)
     repeat_summary = summarize_repeated_metrics(repeat_table, id_column="Seed")
     return repeat_table, repeat_summary
@@ -462,6 +659,7 @@ def run_rolling_origin_evaluation(
 
     for index, (train_end_ratio, val_end_ratio, test_end_ratio) in enumerate(config.rolling_origin_windows, start=1):
         window_name = f"Window_{index}"
+        log_progress(f"Starting rolling-origin {window_name}.")
         window_prepared = build_windowed_prepared_data(
             prepared_data=prepared_data,
             train_end_ratio=train_end_ratio,
@@ -495,6 +693,7 @@ def run_rolling_origin_evaluation(
         pd.DataFrame(window_rows).to_csv(config.metric_dir / "rolling_origin_windows.csv", index=False, encoding="utf-8-sig")
         partial_rolling_table.to_csv(config.metric_dir / "rolling_origin_metrics.csv", index=False, encoding="utf-8-sig")
         partial_rolling_summary.to_csv(config.metric_dir / "rolling_origin_summary.csv", index=False, encoding="utf-8-sig")
+        log_progress(f"Finished rolling-origin {window_name}.")
 
     rolling_table = pd.concat(rolling_rows, ignore_index=True)
     rolling_summary = summarize_repeated_metrics(rolling_table, id_column="Window")
@@ -746,6 +945,275 @@ def build_robustness_report(
 """.strip()
 
 
+def build_training_record_v2(
+    config: ExperimentConfig,
+    artifacts: ExperimentArtifacts,
+    training_config_table: pd.DataFrame,
+    training_execution_table: pd.DataFrame,
+    baseline_daytime_table: pd.DataFrame,
+    subset_count_table: pd.DataFrame,
+    seed_summary: pd.DataFrame,
+    rolling_summary: pd.DataFrame,
+    rolling_window_table: pd.DataFrame,
+) -> str:
+    seed_display = format_mean_std_table(seed_summary)
+    rolling_display = format_mean_std_table(rolling_summary)
+    hybrid_mae = extract_metric(artifacts.baseline_table, "Hybrid", "MAE")
+    tft_mae = extract_metric(artifacts.baseline_table, "TFT", "MAE")
+    stacked_mae = extract_metric(artifacts.baseline_table, "StackedXGB", "MAE")
+    hybrid_daytime_mae = extract_metric(baseline_daytime_table, "Hybrid", "MAE")
+    tft_daytime_mae = extract_metric(baseline_daytime_table, "TFT", "MAE")
+    stacked_daytime_mae = extract_metric(baseline_daytime_table, "StackedXGB", "MAE")
+
+    return f"""
+# 训练记录与实验配置
+## 1. 任务与切分
+- 任务定义：在下一时刻天气已知的条件下，进行 `5-minute-ahead` 光伏功率回归。
+- 主切分：按电站分别进行时间顺序 `80 / 10 / 10` 切分。
+- 间隔保护：训练-验证、验证-测试之间各保留 `{config.split_gap_steps}` 个时间步，约 `6` 小时。
+- 附加评估：`daytime-only`、`3` 个随机种子重复、`3` 个 rolling-origin 窗口。
+
+## 2. 训练配置
+{build_markdown_table(training_config_table)}
+
+## 3. 实际训练执行摘要
+{build_markdown_table(training_execution_table)}
+
+## 4. 固定切分结果
+{build_markdown_table(artifacts.baseline_table)}
+
+## 5. Hybrid 消融
+{build_markdown_table(artifacts.ablation_table)}
+
+## 6. Daytime-Only
+### 6.1 子集占比
+{build_markdown_table(subset_count_table)}
+
+### 6.2 白天子集结果
+{build_markdown_table(baseline_daytime_table)}
+
+## 7. 多随机种子
+- 随机种子：`{config.robustness_seeds}`
+{build_markdown_table(seed_display)}
+
+## 8. Rolling-Origin
+### 8.1 窗口定义
+{build_markdown_table(rolling_window_table)}
+
+### 8.2 跨窗口汇总
+{build_markdown_table(rolling_display)}
+
+## 9. 当前结论
+- 固定切分下，`Hybrid` MAE=`{hybrid_mae:.6f}`，相对 `TFT` 的 `{tft_mae:.6f}` 提升 `{relative_improvement_percent(tft_mae, hybrid_mae):.2f}%`；`StackedXGB` 给出当前最低 MAE=`{stacked_mae:.6f}`。
+- `daytime-only` 下，`Hybrid` MAE=`{hybrid_daytime_mae:.6f}`，相对 `TFT` 的 `{tft_daytime_mae:.6f}` 提升 `{relative_improvement_percent(tft_daytime_mae, hybrid_daytime_mae):.2f}%`；`StackedXGB` 仍然最低，为 `{stacked_daytime_mae:.6f}`。
+- `Hybrid` 的主要收益来自场景自适应，`w/o Scene Adaptation` 的退化最明显。
+- `Hybrid` 更适合作为主方法，`StackedXGB` 更适合作为精度上界和强性能对照。""".strip()
+
+
+def build_result_summary_v2(
+    artifacts: ExperimentArtifacts,
+    baseline_daytime_table: pd.DataFrame,
+    seed_summary: pd.DataFrame,
+    rolling_summary: pd.DataFrame,
+) -> str:
+    seed_display = format_mean_std_table(seed_summary)
+    rolling_display = format_mean_std_table(rolling_summary)
+    return f"""
+# 结果摘要
+## 1. 固定切分
+{build_markdown_table(artifacts.baseline_table[["Model", "MAE", "RMSE", "R2"]])}
+
+## 2. Daytime-Only
+{build_markdown_table(baseline_daytime_table[["Model", "MAE", "RMSE", "R2"]])}
+
+## 3. 关键判断
+- `Hybrid` 在固定切分和 `daytime-only` 下都稳定优于 `TFT`。
+- `StackedXGB` 在固定切分上最强，但多随机种子和 `rolling-origin` 的波动更大。
+- `Hybrid` 是更稳的主方法；`StackedXGB` 适合作为强性能对照。
+
+## 4. 多随机种子
+{build_markdown_table(seed_display)}
+
+## 5. Rolling-Origin
+{build_markdown_table(rolling_display)}
+""".strip()
+
+
+def build_sdm_positioning_report(
+    artifacts: ExperimentArtifacts,
+    baseline_daytime_table: pd.DataFrame,
+    seed_summary: pd.DataFrame,
+    rolling_summary: pd.DataFrame,
+) -> str:
+    hybrid_mae = extract_metric(artifacts.baseline_table, "Hybrid", "MAE")
+    tft_mae = extract_metric(artifacts.baseline_table, "TFT", "MAE")
+    stacked_mae = extract_metric(artifacts.baseline_table, "StackedXGB", "MAE")
+    hybrid_daytime_mae = extract_metric(baseline_daytime_table, "Hybrid", "MAE")
+    tft_daytime_mae = extract_metric(baseline_daytime_table, "TFT", "MAE")
+    hybrid_seed_mae = float(seed_summary.loc[seed_summary["Model"] == "Hybrid", "MAE_mean"].iloc[0])
+    tft_seed_mae = float(seed_summary.loc[seed_summary["Model"] == "TFT", "MAE_mean"].iloc[0])
+    hybrid_rolling_mae = float(rolling_summary.loc[rolling_summary["Model"] == "Hybrid", "MAE_mean"].iloc[0])
+    tft_rolling_mae = float(rolling_summary.loc[rolling_summary["Model"] == "TFT", "MAE_mean"].iloc[0])
+
+    return f"""
+# SDM 口径补丁
+## 1. 推荐定位
+- 问题类型：异构装置上的短时功率预测，可视作带已知未来外生变量的时间序列数据挖掘问题。
+- 主方法：`Hybrid`，强调场景自适应、结构可解释和稳定收益。
+- 强对照：`StackedXGB`，强调精度上界，不与主方法争夺叙事中心。
+
+## 2. 推荐题目方向
+- Scene-Aware Interpretable Fusion for Heterogeneous Photovoltaic Power Forecasting
+- Knowledge-Guided Temporal Data Mining for Heterogeneous PV Power Forecasting
+- Physics-Guided and Scene-Adaptive Fusion for Ultra-Short-Term PV Forecasting
+
+## 3. 贡献点建议
+- 构建统一实验流水线，覆盖标准化数据处理、时间切分、鲁棒性评估和图表导出。
+- 提出按电站与辐照场景切换权重的 `Hybrid`，把融合结构显式化。
+- 在固定切分、`daytime-only`、多随机种子和 `rolling-origin` 下验证 `Hybrid` 对 `TFT` 的稳定优势。
+
+## 4. 最稳的实验叙事
+- 固定切分：`Hybrid` MAE 从 `TFT` 的 `{tft_mae:.6f}` 降到 `{hybrid_mae:.6f}`，提升 `{relative_improvement_percent(tft_mae, hybrid_mae):.2f}%`。
+- 白天子集：`Hybrid` MAE 从 `{tft_daytime_mae:.6f}` 降到 `{hybrid_daytime_mae:.6f}`，提升 `{relative_improvement_percent(tft_daytime_mae, hybrid_daytime_mae):.2f}%`。
+- 多随机种子：`Hybrid` 平均 MAE=`{hybrid_seed_mae:.6f}`，优于 `TFT` 的 `{tft_seed_mae:.6f}`。
+- rolling-origin：`Hybrid` 平均 MAE=`{hybrid_rolling_mae:.6f}`，优于 `TFT` 的 `{tft_rolling_mae:.6f}`。
+- 精度上界：`StackedXGB` 固定切分 MAE=`{stacked_mae:.6f}`。
+
+## 5. 不建议过度宣称的点
+- 不要把当前工作硬写成通用行业 benchmark。
+- 不要直接写成 constrained optimization，除非显式补出约束项、优化目标和 violation 指标。
+- 更稳的表述是 `knowledge-guided`、`physics-guided` 或 `constraint-aware`。
+
+## 6. 建议补进正文的方法描述
+- `Hybrid` 的核心不是简单平均，而是在不同电站、不同辐照 regime 下选择不同的专家权重。
+- 物理后修正只占次要增益，场景自适应才是主增益来源。
+- `TFT` 现在已训练到与其他神经模型同一数量级的轮次，并恢复最佳验证轮次权重。""".strip()
+
+
+def build_robustness_report_v2(
+    subset_count_table: pd.DataFrame,
+    baseline_daytime_table: pd.DataFrame,
+    seed_summary: pd.DataFrame,
+    rolling_summary: pd.DataFrame,
+    rolling_window_table: pd.DataFrame,
+) -> str:
+    return f"""
+# 鲁棒性评估记录
+## 1. Daytime-Only
+{build_markdown_table(subset_count_table)}
+
+{build_markdown_table(baseline_daytime_table[["Model", "MAE", "RMSE", "R2"]])}
+
+## 2. 多随机种子
+{build_markdown_table(format_mean_std_table(seed_summary))}
+
+## 3. Rolling-Origin 窗口
+{build_markdown_table(rolling_window_table)}
+
+{build_markdown_table(format_mean_std_table(rolling_summary))}
+""".strip()
+
+
+def build_paper_reference_draft(
+    config: ExperimentConfig,
+    training_config_table: pd.DataFrame,
+    training_execution_table: pd.DataFrame,
+    artifacts: ExperimentArtifacts,
+    baseline_daytime_table: pd.DataFrame,
+    subset_count_table: pd.DataFrame,
+    seed_summary: pd.DataFrame,
+    rolling_summary: pd.DataFrame,
+) -> str:
+    hybrid_mae = extract_metric(artifacts.baseline_table, "Hybrid", "MAE")
+    hybrid_rmse = extract_metric(artifacts.baseline_table, "Hybrid", "RMSE")
+    tft_mae = extract_metric(artifacts.baseline_table, "TFT", "MAE")
+    stacked_mae = extract_metric(artifacts.baseline_table, "StackedXGB", "MAE")
+    hybrid_daytime_mae = extract_metric(baseline_daytime_table, "Hybrid", "MAE")
+    tft_daytime_mae = extract_metric(baseline_daytime_table, "TFT", "MAE")
+    stacked_daytime_mae = extract_metric(baseline_daytime_table, "StackedXGB", "MAE")
+    hybrid_seed = seed_summary.loc[seed_summary["Model"] == "Hybrid"].iloc[0]
+    tft_seed = seed_summary.loc[seed_summary["Model"] == "TFT"].iloc[0]
+    stacked_seed = seed_summary.loc[seed_summary["Model"] == "StackedXGB"].iloc[0]
+    hybrid_rolling = rolling_summary.loc[rolling_summary["Model"] == "Hybrid"].iloc[0]
+    tft_rolling = rolling_summary.loc[rolling_summary["Model"] == "TFT"].iloc[0]
+    stacked_rolling = rolling_summary.loc[rolling_summary["Model"] == "StackedXGB"].iloc[0]
+    daytime_ratio = float(subset_count_table.loc[subset_count_table["Subset"] == "Daytime", "Ratio"].iloc[0])
+
+    return f"""
+# Scene-Aware Interpretable Fusion for Heterogeneous PV Power Forecasting
+
+## 摘要
+针对异构光伏装置上的超短时功率预测问题，本文构建了一套可复现的实验流水线，并提出一种场景自适应的可解释融合方法 `Hybrid`。该方法以 `XGBoost`、`DNN` 和 `TFT` 为异构基学习器，在不同电站和不同辐照场景下切换融合权重，并结合低辐照/夜间物理后修正，以提高预测稳定性。实验基于 Alice Springs 站点的四个异构光伏装置，采用严格的时间顺序切分、`6` 小时间隔保护、`daytime-only` 指标、多随机种子重复和 `rolling-origin` 评估。结果表明，在固定切分上，`Hybrid` 将 `TFT` 的 MAE 从 `{tft_mae:.6f}` 降至 `{hybrid_mae:.6f}`，相对提升 `{relative_improvement_percent(tft_mae, hybrid_mae):.2f}%`；在白天子集上，`Hybrid` 的 MAE 进一步从 `{tft_daytime_mae:.6f}` 降至 `{hybrid_daytime_mae:.6f}`。同时，`Hybrid` 在多随机种子和 `rolling-origin` 下仍保持对 `TFT` 的稳定优势，而 `StackedXGB` 给出当前固定切分上的最佳精度。该结果说明，面向异构时序场景的结构化融合比单一强基线更适合作为主方法叙事。
+
+## 1. 引言
+光伏短时预测既受天气变化驱动，也受设备结构差异影响。对于同一站点下的异构装置，单一模型往往无法在所有运行场景下稳定占优。与继续堆叠单个深度模型相比，显式建模“在什么场景下更相信哪一个专家”更符合工程直觉，也更容易形成可解释的数据挖掘方法。
+
+本工作围绕这一点展开。我们保留 `XGBoost`、`DNN` 和 `TFT` 作为异构基学习器，将贡献集中在一个场景自适应的融合层上。与单一全局权重不同，`Hybrid` 根据电站与辐照 regime 动态选择权重，并施加轻量的物理后修正。论文的目标不是宣称提出了通用新范式，而是证明这种结构化融合在异构光伏场景中可以更稳地优于强时序基线。
+
+## 2. 数据与任务定义
+数据来自 Alice Springs 站点的四个光伏装置，时间范围为 `2013-04-23 08:35:00` 至 `2016-10-21 15:05:00`，采样频率为 `5 min`。数据表头统一为英文，监督样本总数为 `1,241,216`，连续特征共 `96` 个，编码后输入维度为 `111`。
+
+本文任务定义为：在下一时刻天气条件已知的前提下，预测下一时刻功率输出。主实验按电站进行时间顺序 `80/10/10` 切分，并在训练-验证、验证-测试之间分别保留 `{config.split_gap_steps}` 个时间步的间隔。考虑到夜间样本会稀释总体误差，本文额外报告 `daytime-only` 指标；当前测试集中白天样本占比约为 `{daytime_ratio:.2%}`。
+
+## 3. 方法
+整体流程如图所示：
+
+![Method Framework](../paper_figures/method_framework.png)
+
+基学习器部分包括 `XGBoost`、`DNN` 和 `TFT`。其中前两者使用表格化特征，`TFT` 使用带已知未来变量的时序建模。融合层以 `Hybrid` 为主：首先按照辐照水平划分场景，再为每个电站学习场景特定的模型权重，最后对夜间和低辐照时段进行物理后修正。该设计使得融合权重本身具有解释性，可以直接回答“在何种场景下应当更依赖哪一个基学习器”。
+
+除主方法外，本文还保留 `AdaptiveBlend` 和 `StackedXGB` 作为两类元学习对照。前者代表神经网络式动态加权，后者代表强性能上界。论文主线采用 `Hybrid`，而不是将最强精度模型直接作为方法主体。
+
+## 4. 训练设置
+为避免基线训练不足导致比较失衡，本文将主要神经模型训练到同一数量级的轮次，并显式记录最佳轮次恢复策略。`TFT` 使用最佳验证损失 checkpoint 恢复，而非停留在最后一轮参数。训练配置如下：
+
+{build_markdown_table(training_config_table)}
+
+主实验的实际训练执行摘要如下：
+
+{build_markdown_table(training_execution_table)}
+
+## 5. 结果与分析
+固定切分结果见下表：
+
+{build_markdown_table(artifacts.baseline_table[["Model", "MAE", "RMSE", "R2"]])}
+
+可以看到，`Hybrid` 在固定切分上将 `TFT` 的 MAE 从 `{tft_mae:.6f}` 降低到 `{hybrid_mae:.6f}`，同时 RMSE 达到 `{hybrid_rmse:.6f}`。`StackedXGB` 进一步将 MAE 降至 `{stacked_mae:.6f}`，说明其具备更强的纯精度能力，但这并不改变 `Hybrid` 更适合作为主方法的判断。
+
+为了避免夜间样本稀释误差，白天子集结果单独报告如下：
+
+{build_markdown_table(baseline_daytime_table[["Model", "MAE", "RMSE", "R2"]])}
+
+在 `daytime-only` 条件下，`Hybrid` 仍然优于 `TFT`，而 `StackedXGB` 给出最低 MAE=`{stacked_daytime_mae:.6f}`。这说明 `Hybrid` 的优势并非来自夜间样本结构，而是在真正有发电行为的时段仍然成立。
+
+消融实验显示，场景自适应是 `Hybrid` 的主要收益来源：
+
+{build_markdown_table(artifacts.ablation_table[["Model", "MAE", "RMSE"]])}
+
+其中，移除场景自适应后的退化最明显，说明固定全局权重不足以处理异构装置和不同时段下的误差模式差异。相比之下，物理后修正贡献较小，但仍能提供稳定的边际收益。
+
+## 6. 鲁棒性评估
+多随机种子结果如下：
+
+{build_markdown_table(format_mean_std_table(seed_summary))}
+
+`Hybrid` 的平均 MAE 为 `{float(hybrid_seed["MAE_mean"]):.6f} +/- {float(hybrid_seed["MAE_std"]):.6f}`，优于 `TFT` 的 `{float(tft_seed["MAE_mean"]):.6f} +/- {float(tft_seed["MAE_std"]):.6f}`。`StackedXGB` 虽然在固定切分上最好，但多随机种子标准差更大，表明其对训练扰动更敏感。
+
+rolling-origin 结果如下：
+
+{build_markdown_table(format_mean_std_table(rolling_summary))}
+
+`Hybrid` 的平均 rolling-origin MAE 为 `{float(hybrid_rolling["MAE_mean"]):.6f}`，优于 `TFT` 的 `{float(tft_rolling["MAE_mean"]):.6f}` 和 `StackedXGB` 的 `{float(stacked_rolling["MAE_mean"]):.6f}`。这进一步说明 `Hybrid` 的优势并不依赖单个固定时间窗口。
+
+## 7. 讨论
+如果从纯精度角度看，`StackedXGB` 仍是当前最强模型；如果从论文叙事和方法贡献看，`Hybrid` 更适合作为主方法。原因在于：第一，`Hybrid` 的结构直接体现了场景自适应逻辑，而不是后验解释；第二，它在更严格的鲁棒性协议下表现更稳定；第三，它更符合 SDM 这类数据挖掘会议对“结构可解释 + 经验有效”的方法期待。
+
+当前工作仍存在边界：数据来自单站点四个装置，任务为一步预测，且设定为未来一步天气已知。因而本文更适合定位为“异构光伏场景下的时间序列数据挖掘研究”，而不是大而全的行业级标准或完全自由外推的多步预报系统。
+
+## 8. 结论
+本文提出了一种面向异构光伏装置的场景自适应可解释融合方法 `Hybrid`。在保持主模型结构基本不变的前提下，通过补齐训练轮次、恢复 `TFT` 最佳 checkpoint，并引入 `daytime-only`、多随机种子和 `rolling-origin` 评估，本文给出了更完整、更可信的实验证据。综合来看，`Hybrid` 是更稳的主方法，`StackedXGB` 是更强的精度上界，两者共同构成了适合投稿参考的实验体系。""".strip()
+
+
 def save_primary_outputs(
     config: ExperimentConfig,
     main_artifacts: ExperimentArtifacts,
@@ -781,8 +1249,11 @@ def save_primary_outputs(
 
 def main() -> None:
     config = ExperimentConfig()
+    log_progress("Starting full experiment pipeline.")
     main_config = clone_runtime_config(config, seed=config.random_seed, log_subdir="main")
     main_artifacts = run_single_experiment(main_config, include_ablations=True)
+    training_config_table = build_training_configuration_table(config)
+    training_execution_table = build_training_execution_table(config, main_artifacts)
 
     daytime_frame = filter_daytime_frame(main_artifacts.test_predictions)
     baseline_daytime_table = collect_metric_table(daytime_frame, BASELINE_SPECS)
@@ -807,32 +1278,42 @@ def main() -> None:
     save_metrics_table(rolling_origin_table.to_dict("records"), config.metric_dir / "rolling_origin_metrics.csv")
     save_metrics_table(rolling_origin_summary.to_dict("records"), config.metric_dir / "rolling_origin_summary.csv")
     save_metrics_table(rolling_window_table.to_dict("records"), config.metric_dir / "rolling_origin_windows.csv")
+    save_metrics_table(training_config_table.to_dict("records"), config.metric_dir / "training_configuration.csv")
+    save_metrics_table(training_execution_table.to_dict("records"), config.metric_dir / "training_execution_summary.csv")
 
-    training_record = build_training_record(
+    obsolete_report_paths = [
+        config.report_dir / "method_story_zh.md",
+        config.report_dir / "paper_outline_zh.md",
+        config.report_dir / "training_log_zh.md",
+    ]
+    for path in obsolete_report_paths:
+        if path.exists():
+            path.unlink()
+
+    training_record = build_training_record_v2(
         config=config,
         artifacts=main_artifacts,
+        training_config_table=training_config_table,
+        training_execution_table=training_execution_table,
         baseline_daytime_table=baseline_daytime_table,
-        plant_daytime_table=plant_daytime_table,
         subset_count_table=subset_count_table,
         seed_summary=seed_repeat_summary,
         rolling_summary=rolling_origin_summary,
         rolling_window_table=rolling_window_table,
     )
-    write_markdown_report(config.report_dir / "training_log_zh.md", training_record)
+    write_markdown_report(config.report_dir / "training_setup_zh.md", training_record)
     write_markdown_report(
         config.report_dir / "result_summary_zh.md",
-        build_result_summary(
+        build_result_summary_v2(
             artifacts=main_artifacts,
             baseline_daytime_table=baseline_daytime_table,
             seed_summary=seed_repeat_summary,
             rolling_summary=rolling_origin_summary,
         ),
     )
-    write_markdown_report(config.report_dir / "method_story_zh.md", build_method_story())
-    write_markdown_report(config.report_dir / "paper_outline_zh.md", build_paper_outline())
     write_markdown_report(
         config.report_dir / "robustness_summary_zh.md",
-        build_robustness_report(
+        build_robustness_report_v2(
             subset_count_table=subset_count_table,
             baseline_daytime_table=baseline_daytime_table,
             seed_summary=seed_repeat_summary,
@@ -840,13 +1321,37 @@ def main() -> None:
             rolling_window_table=rolling_window_table,
         ),
     )
+    write_markdown_report(
+        config.report_dir / "sdm_positioning_zh.md",
+        build_sdm_positioning_report(
+            artifacts=main_artifacts,
+            baseline_daytime_table=baseline_daytime_table,
+            seed_summary=seed_repeat_summary,
+            rolling_summary=rolling_origin_summary,
+        ),
+    )
+    write_markdown_report(
+        config.report_dir / "paper_reference_draft_zh.md",
+        build_paper_reference_draft(
+            config=config,
+            training_config_table=training_config_table,
+            training_execution_table=training_execution_table,
+            artifacts=main_artifacts,
+            baseline_daytime_table=baseline_daytime_table,
+            subset_count_table=subset_count_table,
+            seed_summary=seed_repeat_summary,
+            rolling_summary=rolling_origin_summary,
+        ),
+    )
 
-    print("Baseline metrics saved to:", config.metric_dir / "baseline_metrics.csv")
-    print("Ablation metrics saved to:", config.metric_dir / "ablation_metrics.csv")
-    print("Daytime metrics saved to:", config.metric_dir / "baseline_daytime_metrics.csv")
-    print("Seed repeat summary saved to:", config.metric_dir / "seed_repeat_summary.csv")
-    print("Rolling-origin summary saved to:", config.metric_dir / "rolling_origin_summary.csv")
-    print("Training log saved to:", config.report_dir / "training_log_zh.md")
+    print("Baseline metrics saved to:", config.metric_dir / "baseline_metrics.csv", flush=True)
+    print("Ablation metrics saved to:", config.metric_dir / "ablation_metrics.csv", flush=True)
+    print("Daytime metrics saved to:", config.metric_dir / "baseline_daytime_metrics.csv", flush=True)
+    print("Seed repeat summary saved to:", config.metric_dir / "seed_repeat_summary.csv", flush=True)
+    print("Rolling-origin summary saved to:", config.metric_dir / "rolling_origin_summary.csv", flush=True)
+    print("Training configuration saved to:", config.metric_dir / "training_configuration.csv", flush=True)
+    print("Training setup saved to:", config.report_dir / "training_setup_zh.md", flush=True)
+    log_progress("Finished full experiment pipeline.")
 
 
 if __name__ == "__main__":

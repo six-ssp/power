@@ -65,17 +65,19 @@
     "artifacts\\metrics\\rolling_origin_metrics.csv": true,
     "artifacts\\metrics\\rolling_origin_summary.csv": true,
     "artifacts\\metrics\\rolling_origin_windows.csv": true,
+    "artifacts\\metrics\\training_configuration.csv": true,
+    "artifacts\\metrics\\training_execution_summary.csv": true,
     "artifacts\\metrics\\validation_predictions.csv": true,
     "artifacts\\metrics\\test_predictions.csv": true,
     "artifacts\\plots\\baseline_mae_rmse.png": true,
     "artifacts\\plots\\baseline_daytime_mae_rmse.png": true,
     "artifacts\\plots\\forecast_examples.png": true,
     "artifacts\\plots\\training_curves.png": true,
-    "artifacts\\reports\\training_log_zh.md": true,
-    "artifacts\\reports\\paper_outline_zh.md": true,
-    "artifacts\\reports\\method_story_zh.md": true,
+    "artifacts\\reports\\training_setup_zh.md": true,
     "artifacts\\reports\\result_summary_zh.md": true,
     "artifacts\\reports\\robustness_summary_zh.md": true,
+    "artifacts\\reports\\sdm_positioning_zh.md": true,
+    "artifacts\\reports\\paper_reference_draft_zh.md": true,
     "artifacts\\paper_figures\\method_framework.png": true
   },
   "checks": {
@@ -95,6 +97,8 @@
     "daytime_metrics_non_null": true,
     "seed_repeat_non_null": true,
     "rolling_origin_non_null": true,
+    "training_config_non_null": true,
+    "training_execution_non_null": true,
     "cuda_available": true
   }
 }

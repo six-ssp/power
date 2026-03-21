@@ -14,6 +14,7 @@ This repository provides a reproducible experimental pipeline for `5-minute-ahea
 - Unified comparison of `Persistence`, `XGBoost`, `DNN`, `TFT`, `Hybrid`, `AdaptiveBlend`, and `StackedXGB`
 - Standardized English dataset schema and automated preprocessing pipeline
 - Time-ordered evaluation with split gap, `daytime-only`, multi-seed, and `rolling-origin` protocols
+- Exported training budget and executed-epoch summaries for paper-ready experiment reporting
 - Automatic export of metrics, predictions, plots, paper figures, and Chinese experiment records
 - Codebase organized for repeated paper experiments rather than one-off notebook runs
 
@@ -80,6 +81,18 @@ Rebuild split parts from local raw CSV files:
 
 `MAPE` is exported for completeness, but `MAE`, `RMSE`, and `R2` are the primary metrics because nighttime power is often close to zero.
 
+## Training Budget
+
+| Model | Max epochs / rounds | Batch size | Early stop / patience | Notes |
+| --- | ---: | ---: | ---: | --- |
+| XGBoost | 300 | - | 30 | validation RMSE early stopping |
+| DNN | 12 | 8192 | 3 | best-state restore |
+| TFT | 6 | 4096 | 2 | 24-step encoder, hidden size 16, 2 heads, best checkpoint restore |
+| AdaptiveBlend | 12 | 16384 | 4 | validation-holdout MAE selection |
+| StackedXGB | 600 | - | 50 | validation-holdout RMSE early stopping |
+
+The current `TFT` setting is a compute-feasible strong baseline for an `8 GB` GPU. It uses a shorter encoder window and narrower hidden width than the earliest exploratory version, but it restores the best validation checkpoint and is trained under the same robustness protocol as the other models. The exported training records live in `artifacts/metrics/training_configuration.csv` and `artifacts/metrics/training_execution_summary.csv`.
+
 ## Repository Layout
 
 ```text
@@ -139,20 +152,20 @@ py -3.12 -m venv .venv
 | --- | ---: | ---: | ---: |
 | Persistence | 0.049670 | 0.175950 | 0.980560 |
 | XGBoost | 0.042605 | 0.087974 | 0.995140 |
-| DNN | 0.035966 | 0.068893 | 0.997020 |
-| TFT | 0.024010 | 0.062329 | 0.997560 |
-| Hybrid | 0.018909 | 0.060678 | 0.997688 |
-| AdaptiveBlend | 0.019469 | 0.062321 | 0.997561 |
-| StackedXGB | 0.018220 | 0.059508 | 0.997776 |
+| DNN | 0.033542 | 0.068490 | 0.997054 |
+| TFT | 0.034981 | 0.085896 | 0.995367 |
+| Hybrid | 0.022353 | 0.065827 | 0.997279 |
+| AdaptiveBlend | 0.023163 | 0.064592 | 0.997380 |
+| StackedXGB | 0.021933 | 0.063170 | 0.997494 |
 
 ### Robustness Summary
 
 | Setting | TFT | Hybrid | StackedXGB |
 | --- | ---: | ---: | ---: |
-| Fixed split MAE | 0.024010 | 0.018909 | 0.018220 |
-| Daytime-only MAE | 0.041529 | 0.039110 | 0.037548 |
-| Multi-seed MAE | 0.022546 +/- 0.004298 | 0.018388 +/- 0.001330 | 0.038971 +/- 0.019228 |
-| Rolling-origin MAE | 0.036315 +/- 0.012042 | 0.028419 +/- 0.008966 | 0.032228 +/- 0.013279 |
+| Fixed split MAE | 0.034981 | 0.022353 | 0.021933 |
+| Daytime-only MAE | 0.068453 | 0.045330 | 0.043082 |
+| Multi-seed MAE | 0.034968 +/- 0.004537 | 0.021386 +/- 0.000792 | 0.022458 +/- 0.002222 |
+| Rolling-origin MAE | 0.053056 +/- 0.022264 | 0.029571 +/- 0.006767 | 0.034514 +/- 0.013087 |
 
 Interpretation:
 
@@ -164,10 +177,10 @@ Interpretation:
 
 | Variant | MAE | RMSE |
 | --- | ---: | ---: |
-| Full Hybrid | 0.018909 | 0.060678 |
-| w/o Physics | 0.018941 | 0.060678 |
-| w/o Plant Adaptation | 0.020038 | 0.061104 |
-| w/o Scene Adaptation | 0.021717 | 0.065940 |
+| Full Hybrid | 0.022353 | 0.065827 |
+| w/o Physics | 0.022658 | 0.065837 |
+| w/o Plant Adaptation | 0.022447 | 0.066003 |
+| w/o Scene Adaptation | 0.024083 | 0.068320 |
 
 The ablation indicates that scene adaptation is the main source of improvement, while the physics correction is a smaller but still measurable refinement.
 
@@ -196,10 +209,10 @@ The ablation indicates that scene adaptation is the main source of improvement, 
 
 | Path | Description |
 | --- | --- |
-| `artifacts/metrics/` | result tables, ablations, daytime metrics, multi-seed summaries, rolling-origin summaries, predictions |
+| `artifacts/metrics/` | result tables, ablations, daytime metrics, multi-seed summaries, rolling-origin summaries, training budget tables, predictions |
 | `artifacts/plots/` | general experiment plots |
 | `artifacts/paper_figures/` | paper-ready figures |
-| `artifacts/reports/` | Chinese training log, result summary, method story, robustness summary |
+| `artifacts/reports/` | Chinese training setup, result summary, robustness summary, SDM positioning notes, reference draft |
 | `artifacts/checks/` | project verification outputs |
 
 ## Reproducibility Notes

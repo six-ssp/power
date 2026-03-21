@@ -1,0 +1,6 @@
+﻿Model,TrainingUnit,MaxEpochsOrRounds,ExecutedEpochsOrRounds,BestEpochOrRound,SelectionMetric,BestSelectionScore
+XGBoost,boosting rounds,300,102,72,val_rmse,0.15447940640126953
+DNN,epochs,12,9,6,val_rmse,0.11929839662856777
+TFT,epochs,6,3,1,val_loss,0.0579539574682712
+AdaptiveBlend,epochs,12,12,12,holdout_mae,0.08909236336868204
+StackedXGB,boosting rounds,600,217,167,holdout_rmse,0.27835339126089037

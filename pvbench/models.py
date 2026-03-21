@@ -2,6 +2,7 @@
 
 import itertools
 import os
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,7 +11,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from lightning.pytorch.callbacks import EarlyStopping
+from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 from lightning.pytorch.loggers import CSVLogger
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
@@ -180,7 +181,7 @@ HYBRID_SCENE_NAMES = ("night", "low_radiation", "mid_radiation", "high_radiation
 
 
 def resolve_loader_workers(config: ExperimentConfig) -> int:
-    return 0 if os.name == "nt" else config.num_workers
+    return max(0, config.num_workers)
 
 
 def fit_xgboost(
@@ -194,7 +195,7 @@ def fit_xgboost(
     xgb_params = dict(config.xgb_params)
     if torch.cuda.is_available():
         xgb_params["device"] = "cuda"
-    model = XGBRegressor(**xgb_params, early_stopping_rounds=30)
+    model = XGBRegressor(**xgb_params, early_stopping_rounds=config.xgb_early_stopping_rounds)
     model.fit(
         train_matrix,
         y_train,
@@ -382,19 +383,29 @@ def fit_tft(prepared_data: PreparedData, config: ExperimentConfig) -> TFTResult:
         persistent_workers=num_workers > 0,
     )
 
-    logger = CSVLogger(save_dir=str(config.log_dir), name="tft")
+    logger_root = config.log_dir / "tft"
+    if logger_root.exists():
+        shutil.rmtree(logger_root)
+    logger = CSVLogger(save_dir=str(config.log_dir), name="tft", version="current")
     early_stop = EarlyStopping(monitor="val_loss", min_delta=1e-4, patience=config.tft_patience, mode="min")
+    checkpoint_callback = ModelCheckpoint(
+        dirpath=Path(logger.log_dir) / "checkpoints",
+        filename="best",
+        monitor="val_loss",
+        mode="min",
+        save_top_k=1,
+    )
     model = TemporalFusionTransformer.from_dataset(
         training_dataset,
-        learning_rate=1e-3,
+        learning_rate=config.tft_learning_rate,
         hidden_size=config.tft_hidden_size,
         attention_head_size=config.tft_attention_heads,
         hidden_continuous_size=config.tft_hidden_continuous_size,
-        dropout=0.1,
+        dropout=config.tft_dropout,
         output_size=7,
         loss=QuantileLoss(),
         logging_metrics=nn.ModuleList([MAE(), RMSE()]),
-        reduce_on_plateau_patience=1,
+        reduce_on_plateau_patience=config.tft_reduce_on_plateau_patience,
         log_interval=100,
     )
 
@@ -402,22 +413,29 @@ def fit_tft(prepared_data: PreparedData, config: ExperimentConfig) -> TFTResult:
         max_epochs=config.tft_max_epochs,
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
         devices=1,
+        precision=config.tft_precision if torch.cuda.is_available() else "32-true",
         logger=logger,
-        enable_checkpointing=False,
+        enable_checkpointing=True,
         enable_model_summary=False,
-        gradient_clip_val=0.1,
-        callbacks=[early_stop],
+        enable_progress_bar=False,
+        gradient_clip_val=config.tft_gradient_clip_val,
+        callbacks=[early_stop, checkpoint_callback],
         num_sanity_val_steps=0,
     )
     trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
-    val_predictions = model.predict(
+    best_checkpoint_path = checkpoint_callback.best_model_path
+    if not best_checkpoint_path:
+        raise RuntimeError("TFT training did not produce a best checkpoint.")
+    best_model = TemporalFusionTransformer.load_from_checkpoint(best_checkpoint_path)
+
+    val_predictions = best_model.predict(
         val_loader,
         mode="prediction",
         return_y=True,
         trainer_kwargs={"logger": False, "enable_model_summary": False},
     )
-    test_predictions = model.predict(
+    test_predictions = best_model.predict(
         test_loader,
         mode="prediction",
         return_y=True,
@@ -842,7 +860,7 @@ def fit_stacked_xgboost(
     if torch.cuda.is_available():
         stack_params["device"] = "cuda"
 
-    model = XGBRegressor(**stack_params, early_stopping_rounds=50)
+    model = XGBRegressor(**stack_params, early_stopping_rounds=config.stack_xgb_early_stopping_rounds)
     model.fit(
         train_matrix,
         y_train,

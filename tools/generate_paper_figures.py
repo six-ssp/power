@@ -416,6 +416,59 @@ def write_catalog(output: Path) -> None:
     output.write_text(content, encoding="utf-8-sig")
 
 
+def write_catalog_clean(output: Path) -> None:
+    content = "\n".join(
+        [
+            "# Figure Catalog",
+            "",
+            "## baseline_overview.png",
+            "- Overall fixed-split comparison on MAE, RMSE, and R2.",
+            "",
+            "## daytime_baseline_overview.png",
+            "- Daytime-only comparison on MAE, RMSE, and R2.",
+            "",
+            "## ablation_overview.png",
+            "- Hybrid ablation comparison on MAE and RMSE.",
+            "",
+            "## plant_mae_heatmap.png",
+            "- Per-plant MAE heatmap across models.",
+            "",
+            "## plant_rmse_heatmap.png",
+            "- Per-plant RMSE heatmap across models.",
+            "",
+            "## relative_improvement.png",
+            "- Relative MAE improvement over Persistence.",
+            "",
+            "## scatter_comparison.png",
+            "- Actual-versus-predicted scatter plots for TFT and StackedXGB.",
+            "",
+            "## residual_distribution.png",
+            "- Residual density and residual spread comparison.",
+            "",
+            "## hourly_mae_curve.png",
+            "- Hour-of-day MAE profile across representative models.",
+            "",
+            "## plant_gain_over_tft.png",
+            "- Per-plant MAE gain over TFT for meta-model variants.",
+            "",
+            "## seed_stability.png",
+            "- Mean and standard deviation under repeated random seeds.",
+            "",
+            "## rolling_origin_overview.png",
+            "- Rolling-origin MAE and RMSE across evaluation windows.",
+            "",
+            "## method_framework.png",
+            "- Method diagram for the forecasting pipeline and Hybrid fusion.",
+            "",
+            "## Additional Reusable Plots",
+            "- `forecast_examples.png`: example forecasting traces.",
+            "- `training_curves.png`: training convergence curves.",
+            "- `baseline_mae_rmse.png`: simplified baseline MAE/RMSE figure.",
+        ]
+    )
+    output.write_text(content, encoding="utf-8-sig")
+
+
 def main() -> None:
     config = ExperimentConfig()
     metrics_dir = config.metric_dir
@@ -443,7 +496,7 @@ def main() -> None:
     plot_seed_stability(seed_summary, paper_dir / "seed_stability.png")
     plot_rolling_origin_overview(rolling_metrics, paper_dir / "rolling_origin_overview.png")
     plot_method_framework(paper_dir / "method_framework.png")
-    write_catalog(paper_dir / "paper_figure_catalog_zh.md")
+    write_catalog_clean(paper_dir / "paper_figure_catalog_zh.md")
     print("saved", paper_dir)
 
 

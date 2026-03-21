@@ -44,17 +44,19 @@ def main() -> None:
         artifacts_dir / 'metrics' / 'rolling_origin_metrics.csv',
         artifacts_dir / 'metrics' / 'rolling_origin_summary.csv',
         artifacts_dir / 'metrics' / 'rolling_origin_windows.csv',
+        artifacts_dir / 'metrics' / 'training_configuration.csv',
+        artifacts_dir / 'metrics' / 'training_execution_summary.csv',
         artifacts_dir / 'metrics' / 'validation_predictions.csv',
         artifacts_dir / 'metrics' / 'test_predictions.csv',
         artifacts_dir / 'plots' / 'baseline_mae_rmse.png',
         artifacts_dir / 'plots' / 'baseline_daytime_mae_rmse.png',
         artifacts_dir / 'plots' / 'forecast_examples.png',
         artifacts_dir / 'plots' / 'training_curves.png',
-        artifacts_dir / 'reports' / 'training_log_zh.md',
-        artifacts_dir / 'reports' / 'paper_outline_zh.md',
-        artifacts_dir / 'reports' / 'method_story_zh.md',
+        artifacts_dir / 'reports' / 'training_setup_zh.md',
         artifacts_dir / 'reports' / 'result_summary_zh.md',
         artifacts_dir / 'reports' / 'robustness_summary_zh.md',
+        artifacts_dir / 'reports' / 'sdm_positioning_zh.md',
+        artifacts_dir / 'reports' / 'paper_reference_draft_zh.md',
         artifacts_dir / 'paper_figures' / 'method_framework.png',
     ]
 
@@ -78,6 +80,8 @@ def main() -> None:
     seed_repeat_summary = pd.read_csv(artifacts_dir / 'metrics' / 'seed_repeat_summary.csv')
     rolling_origin_summary = pd.read_csv(artifacts_dir / 'metrics' / 'rolling_origin_summary.csv')
     rolling_window_table = pd.read_csv(artifacts_dir / 'metrics' / 'rolling_origin_windows.csv')
+    training_config_table = pd.read_csv(artifacts_dir / 'metrics' / 'training_configuration.csv')
+    training_execution_table = pd.read_csv(artifacts_dir / 'metrics' / 'training_execution_summary.csv')
 
     expected_baseline_models = {'Persistence', 'XGBoost', 'DNN', 'TFT', 'Hybrid', 'AdaptiveBlend', 'StackedXGB'}
     expected_ablation_models = {
@@ -115,6 +119,8 @@ def main() -> None:
         'daytime_metrics_non_null': not baseline_daytime_table.isna().any().any(),
         'seed_repeat_non_null': not seed_repeat_summary.isna().any().any(),
         'rolling_origin_non_null': not rolling_origin_summary.isna().any().any(),
+        'training_config_non_null': not training_config_table.isna().any().any(),
+        'training_execution_non_null': not training_execution_table.isna().any().any(),
         'cuda_available': torch.cuda.is_available(),
     }
 
@@ -157,7 +163,7 @@ def main() -> None:
         '- 主实验入口、配置、数据处理、模型与报告模块均存在。',
         '- `baseline_metrics.csv / ablation_metrics.csv / plant_level_metrics.csv` 已生成。',
         '- `baseline_daytime_metrics.csv / seed_repeat_summary.csv / rolling_origin_summary.csv` 已生成。',
-        '- `README.md`、中文训练记录、论文大纲、方法说明、鲁棒性记录和主要图表已经生成。',
+        '- `README.md`、训练配置记录、SDM 口径说明、参考稿、鲁棒性记录和主要图表已经生成。',
         '- 代码可完成数据加载、特征工程与监督样本构建。',
         '',
         '## 3. 可复现性说明',
@@ -174,6 +180,7 @@ def main() -> None:
             '- 新版 Hybrid 已改为电站级场景融合，并额外保留固定权重版本作为消融对照。',
             '- StackedXGB 仍是重要对照，但主线 Hybrid 现在具备更强的可解释性。',
             '- 项目现在额外提供 daytime-only、多随机种子和 rolling-origin 三类评估结果。',
+            '- 训练配置与实际执行轮次已导出为独立表格，可直接写入论文实验设置。',
             '',
             '## 5. 数据与特征规模',
             f"- 原始样本：`{prepared_data.raw_frame.shape[0]}` 行，`{prepared_data.raw_frame.shape[1]}` 列",
