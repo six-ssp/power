@@ -24,7 +24,9 @@ from pvbench.models import (
     tune_physics_alpha,
 )
 from pvbench.reporting import (
+    build_physical_violation_margin_map,
     compute_metrics,
+    compute_physical_violation_metrics,
     filter_daytime_frame,
     plot_forecast_examples,
     plot_metric_bars,
@@ -210,6 +212,32 @@ def collect_plant_metric_table(frame: pd.DataFrame, specs: dict[str, str]) -> pd
         plant_frame = frame[frame["plant_id"] == plant_id]
         for model_name, column in specs.items():
             metrics = compute_metrics(plant_frame, column)
+            rows.append({"Plant": plant_id, "Model": model_name, **metrics})
+    return pd.DataFrame(rows)
+
+
+def collect_physical_metric_table(
+    frame: pd.DataFrame,
+    specs: dict[str, str],
+    margin_map: dict[str, float],
+) -> pd.DataFrame:
+    rows = []
+    for model_name, column in specs.items():
+        metrics = compute_physical_violation_metrics(frame, column, margin_map)
+        rows.append({"Model": model_name, **metrics})
+    return pd.DataFrame(rows)
+
+
+def collect_plant_physical_metric_table(
+    frame: pd.DataFrame,
+    specs: dict[str, str],
+    margin_map: dict[str, float],
+) -> pd.DataFrame:
+    rows = []
+    for plant_id in sorted(frame["plant_id"].unique()):
+        plant_frame = frame[frame["plant_id"] == plant_id]
+        for model_name, column in specs.items():
+            metrics = compute_physical_violation_metrics(plant_frame, column, margin_map)
             rows.append({"Plant": plant_id, "Model": model_name, **metrics})
     return pd.DataFrame(rows)
 
@@ -1220,12 +1248,16 @@ def save_primary_outputs(
     baseline_daytime_table: pd.DataFrame,
     plant_daytime_table: pd.DataFrame,
     subset_count_table: pd.DataFrame,
+    baseline_physical_table: pd.DataFrame,
+    plant_physical_table: pd.DataFrame,
 ) -> None:
     save_metrics_table(main_artifacts.baseline_table.to_dict("records"), config.metric_dir / "baseline_metrics.csv")
     save_metrics_table(main_artifacts.ablation_table.to_dict("records"), config.metric_dir / "ablation_metrics.csv")
     save_metrics_table(main_artifacts.plant_table.to_dict("records"), config.metric_dir / "plant_level_metrics.csv")
     save_metrics_table(baseline_daytime_table.to_dict("records"), config.metric_dir / "baseline_daytime_metrics.csv")
     save_metrics_table(plant_daytime_table.to_dict("records"), config.metric_dir / "plant_level_daytime_metrics.csv")
+    save_metrics_table(baseline_physical_table.to_dict("records"), config.metric_dir / "baseline_physical_metrics.csv")
+    save_metrics_table(plant_physical_table.to_dict("records"), config.metric_dir / "plant_level_physical_metrics.csv")
     save_metrics_table(subset_count_table.to_dict("records"), config.metric_dir / "subset_counts.csv")
     save_metrics_table(main_artifacts.blend_summary.to_dict("records"), config.metric_dir / "blend_summary.csv")
     main_artifacts.val_predictions.to_csv(config.metric_dir / "validation_predictions.csv", index=False, encoding="utf-8-sig")
@@ -1258,6 +1290,21 @@ def main() -> None:
     daytime_frame = filter_daytime_frame(main_artifacts.test_predictions)
     baseline_daytime_table = collect_metric_table(daytime_frame, BASELINE_SPECS)
     plant_daytime_table = collect_plant_metric_table(daytime_frame, BASELINE_SPECS)
+    physical_margin_map = build_physical_violation_margin_map(
+        main_artifacts.prepared_data.train_frame,
+        tolerance_ratio=config.physical_violation_tolerance_ratio,
+        min_margin=config.physical_violation_min_margin,
+    )
+    baseline_physical_table = collect_physical_metric_table(
+        main_artifacts.test_predictions,
+        BASELINE_SPECS,
+        margin_map=physical_margin_map,
+    )
+    plant_physical_table = collect_plant_physical_metric_table(
+        main_artifacts.test_predictions,
+        BASELINE_SPECS,
+        margin_map=physical_margin_map,
+    )
     subset_count_table = build_subset_count_table(main_artifacts.test_predictions)
 
     save_primary_outputs(
@@ -1266,6 +1313,8 @@ def main() -> None:
         baseline_daytime_table=baseline_daytime_table,
         plant_daytime_table=plant_daytime_table,
         subset_count_table=subset_count_table,
+        baseline_physical_table=baseline_physical_table,
+        plant_physical_table=plant_physical_table,
     )
 
     seed_repeat_table, seed_repeat_summary = run_seed_repeats(config, main_artifacts.prepared_data)

@@ -46,6 +46,46 @@ def compute_metrics(frame: pd.DataFrame, prediction_column: str) -> dict[str, fl
     }
 
 
+def build_physical_violation_margin_map(
+    train_frame: pd.DataFrame,
+    tolerance_ratio: float,
+    min_margin: float,
+) -> dict[str, float]:
+    train_max = train_frame.groupby("plant_id")["target_power"].max().clip(lower=0.0)
+    margin = np.maximum(train_max.to_numpy(dtype=float) * tolerance_ratio, float(min_margin))
+    return {plant_id: float(value) for plant_id, value in zip(train_max.index.tolist(), margin.tolist())}
+
+
+def compute_physical_violation_metrics(
+    frame: pd.DataFrame,
+    prediction_column: str,
+    margin_map: dict[str, float],
+) -> dict[str, float]:
+    if "forecast_night_flag" not in frame.columns:
+        raise KeyError("Expected 'forecast_night_flag' in prediction frame to build physical violation metrics.")
+
+    prediction = frame[prediction_column].to_numpy(dtype=float)
+    night_mask = frame["forecast_night_flag"].to_numpy(dtype=int) == 1
+    margins = frame["plant_id"].map(margin_map).to_numpy(dtype=float)
+
+    negative_mask = prediction < -margins
+    night_positive_mask = night_mask & (prediction > margins)
+    violation_mask = negative_mask | night_positive_mask
+    night_samples = int(night_mask.sum())
+
+    return {
+        "PhysicalViolationRate": float(np.mean(violation_mask)),
+        "NegativeRate": float(np.mean(negative_mask)),
+        "NightPositiveRate": float(np.mean(night_positive_mask)),
+        "NightPositiveRateOnNight": float(night_positive_mask.sum() / night_samples) if night_samples > 0 else 0.0,
+        "ViolationCount": int(violation_mask.sum()),
+        "NegativeCount": int(negative_mask.sum()),
+        "NightPositiveCount": int(night_positive_mask.sum()),
+        "NightSamples": night_samples,
+        "Samples": int(len(frame)),
+    }
+
+
 def filter_daytime_frame(frame: pd.DataFrame) -> pd.DataFrame:
     if "forecast_night_flag" not in frame.columns:
         raise KeyError("Expected 'forecast_night_flag' in prediction frame to build daytime-only metrics.")
