@@ -19,16 +19,16 @@
 - Relative MAE improvement over Persistence.
 
 ## scatter_comparison.png
-- Actual-versus-predicted scatter plots for TFT and StackedXGB.
+- Actual-versus-predicted scatter plots for TFT and Hybrid.
 
 ## residual_distribution.png
-- Residual density and residual spread comparison.
+- Residual density and residual spread comparison for the main methods.
 
 ## hourly_mae_curve.png
 - Hour-of-day MAE profile across representative models.
 
 ## plant_gain_over_tft.png
-- Per-plant MAE gain over TFT for meta-model variants.
+- Per-plant MAE gain over TFT for Hybrid and StackedXGB.
 
 ## seed_stability.png
 - Mean and standard deviation under repeated random seeds.
