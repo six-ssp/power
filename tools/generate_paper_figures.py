@@ -18,8 +18,8 @@ from pvbench.reporting import PLANT_TITLE_MAP
 
 plt.switch_backend("Agg")
 
-BACKGROUND = "#fbfaf6"
-PANEL = "#f7f4ee"
+BACKGROUND = "#ffffff"
+PANEL = "#ffffff"
 TEXT = "#2b2723"
 MUTED = "#736b63"
 GRID = "#d6d0c3"
@@ -90,7 +90,7 @@ plt.rcParams.update(
         "axes.titlesize": 16,
         "axes.labelsize": 13,
         "legend.frameon": True,
-        "legend.facecolor": "#fffdf8",
+        "legend.facecolor": "#ffffff",
         "legend.edgecolor": "#d6cfbf",
     }
 )
