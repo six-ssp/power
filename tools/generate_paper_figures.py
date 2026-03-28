@@ -26,13 +26,13 @@ GRID = "#d6d0c3"
 EDGE = "#fdfcf9"
 
 COLORS = {
-    "Persistence": "#8b6a54",
-    "XGBoost": "#3a5f78",
-    "DNN": "#4d8b87",
-    "TFT": "#d08b3e",
-    "Hybrid": "#c4554d",
-    "AdaptiveBlend": "#6f9153",
-    "StackedXGB": "#8b6f98",
+    "Persistence": "#8DA0CB",
+    "XGBoost": "#56B4E9",
+    "DNN": "#66C2A5",
+    "TFT": "#FC8D62",
+    "Hybrid": "#D55E00",
+    "AdaptiveBlend": "#A6D854",
+    "StackedXGB": "#CC79A7",
 }
 
 DISPLAY_LABELS = {
@@ -65,7 +65,7 @@ PREDICTION_COLUMN_MAP = {
 
 HEATMAP_CMAP = LinearSegmentedColormap.from_list(
     "paper_heat",
-    ["#fffaf0", "#f4d39d", "#d98c57", "#8c4335"],
+    ["#fff8d8", "#F0E442", "#E69F00", "#D55E00"],
 )
 
 plt.rcParams.update(
@@ -143,7 +143,7 @@ def model_colors(models: pd.Series) -> list[str]:
 
 
 def model_edges(models: pd.Series) -> list[str]:
-    return ["#7d2d29" if name == "Hybrid" else EDGE for name in models]
+    return ["#8a3d00" if name == "Hybrid" else EDGE for name in models]
 
 
 def plot_baseline_overview(baseline: pd.DataFrame, output: Path) -> None:
@@ -188,7 +188,7 @@ def plot_ablation_overview(ablation: pd.DataFrame, output: Path) -> None:
     }
     plot_frame = ablation[ablation["Model"].isin(rename_map.keys())].copy()
     plot_frame["VariantDisplay"] = plot_frame["Model"].map(rename_map)
-    colors = ["#c4554d", "#d7aa74", "#99a6b3", "#8f7d5b"]
+    colors = ["#D55E00", "#FFD92F", "#8DA0CB", "#CC79A7"]
 
     figure, axes = plt.subplots(1, 2, figsize=(13.8, 4.8))
     for axis, metric in zip(axes, ["MAE", "RMSE"]):
@@ -329,7 +329,7 @@ def plot_residual_distribution(test_predictions: pd.DataFrame, output: Path) -> 
         [DISPLAY_LABELS.get(name, name) for name in rmse_table["Model"]],
         rmse_table["ResidualStd"],
         color=[COLORS.get(name, "#3a5f78") for name in rmse_table["Model"]],
-        edgecolor=["#7d2d29" if name == "Hybrid" else EDGE for name in rmse_table["Model"]],
+        edgecolor=["#8a3d00" if name == "Hybrid" else EDGE for name in rmse_table["Model"]],
         linewidth=1.2,
         width=0.74,
     )
@@ -393,7 +393,7 @@ def plot_gain_by_plant(plant_table: pd.DataFrame, output: Path) -> None:
         gain_frame["Hybrid_vs_TFT_%"],
         width=width,
         color=COLORS["Hybrid"],
-        edgecolor="#7d2d29",
+        edgecolor="#8a3d00",
         linewidth=1.2,
         label="Hybrid vs TFT",
     )
@@ -480,13 +480,13 @@ def plot_method_framework(output: Path) -> None:
     axis.axis("off")
 
     boxes = [
-        (0.04, 0.64, 0.22, 0.21, "#e8efe8", "Input Features\nHistorical power\nWeather\nSolar geometry\nPhysics cues"),
-        (0.33, 0.75, 0.16, 0.10, "#d9e6ef", "XGBoost"),
-        (0.33, 0.58, 0.16, 0.10, "#dcedea", "DNN"),
-        (0.33, 0.41, 0.16, 0.10, "#f5e4cb", "TFT"),
-        (0.58, 0.58, 0.21, 0.16, "#f0ddd4", "Scene-Aware Fusion\nplant-aware weights\nregime-specific trust"),
-        (0.58, 0.33, 0.21, 0.13, "#efe1e8", "Physics Adjustment\nnight and low-radiation\ncorrection"),
-        (0.84, 0.51, 0.12, 0.15, "#e8e0f0", "Final Power\nForecast"),
+        (0.04, 0.64, 0.22, 0.21, "#f8f4c4", "Input Features\nHistorical power\nWeather\nSolar geometry\nPhysics cues"),
+        (0.33, 0.75, 0.16, 0.10, "#d7edf8", "XGBoost"),
+        (0.33, 0.58, 0.16, 0.10, "#d7f0e6", "DNN"),
+        (0.33, 0.41, 0.16, 0.10, "#fde0d2", "TFT"),
+        (0.58, 0.58, 0.21, 0.16, "#f8d7c7", "Scene-Aware Fusion\nplant-aware weights\nregime-specific trust"),
+        (0.58, 0.33, 0.21, 0.13, "#efd7e8", "Physics Adjustment\nnight and low-radiation\ncorrection"),
+        (0.84, 0.51, 0.12, 0.15, "#e5dcf2", "Final Power\nForecast"),
     ]
 
     for x_pos, y_pos, width, height, color, text in boxes:
@@ -517,9 +517,9 @@ def plot_method_framework(output: Path) -> None:
         axis.annotate("", xy=end, xytext=start, arrowprops=dict(arrowstyle="->", linewidth=1.8, color="#5f584f"))
 
     axis.text(0.04, 0.92, "Scene-Aware Interpretable Fusion", fontsize=16, fontweight="semibold", color=TEXT)
-    axis.text(0.35, 0.895, "Heterogeneous base learners", fontsize=9.8, color="#35576e")
-    axis.text(0.60, 0.79, "Adaptive fusion under changing regimes", fontsize=9.8, color="#8a4d3a")
-    axis.text(0.60, 0.25, "Constraint-aware post-adjustment", fontsize=9.8, color="#7a4b64")
+    axis.text(0.35, 0.895, "Heterogeneous base learners", fontsize=9.8, color="#2f7fb6")
+    axis.text(0.60, 0.79, "Adaptive fusion under changing regimes", fontsize=9.8, color="#D55E00")
+    axis.text(0.60, 0.25, "Constraint-aware post-adjustment", fontsize=9.8, color="#B05A8C")
 
     figure.tight_layout()
     figure.savefig(output, dpi=260, bbox_inches="tight")
