@@ -6,6 +6,8 @@
 - 数据处理链路可加载：`是`
 - Baseline/消融结果表结构正确：`是`
 - GPU 环境可用：`是`
+- 数据集哈希匹配分片清单：`是`
+- 当前结果匹配发布签名：`是`
 
 ## 2. 当前确认无误的内容
 - 原始数据文件存在，且表头与电站 ID 已统一为英文。
@@ -14,6 +16,7 @@
 - `baseline_daytime_metrics.csv / baseline_physical_metrics.csv / seed_repeat_summary.csv / rolling_origin_summary.csv` 已生成。
 - `README.md`、训练配置记录、SDM 口径说明、参考稿、鲁棒性记录和主要图表已经生成。
 - 代码可完成数据加载、特征工程与监督样本构建。
+- 当前检查会额外对 `dataset_parts/manifest.json` 和发布结果签名做一致性比对。
 
 ## 3. 可复现性说明
 - 当前环境：Python 3.12 + CUDA 可用 + GPU 版 PyTorch。

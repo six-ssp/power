@@ -75,6 +75,9 @@ SITE_METADATA = {
 @dataclass
 class ExperimentConfig:
     random_seed: int = 42
+    deterministic_training: bool = True
+    deterministic_warn_only: bool = False
+    deterministic_num_workers: int = 0
     horizon: int = 1
     train_ratio: float = 0.8
     val_ratio: float = 0.1

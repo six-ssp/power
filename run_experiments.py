@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import random
 from copy import deepcopy
 from dataclasses import dataclass
@@ -84,13 +85,17 @@ class ExperimentArtifacts:
     stacked_result: MetaModelResult
 
 
-def set_seed(seed: int) -> None:
+def set_seed(seed: int, deterministic: bool = True, warn_only: bool = False) -> None:
+    os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.set_float32_matmul_precision("high")
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = deterministic
+    torch.backends.cudnn.benchmark = not deterministic
+    torch.use_deterministic_algorithms(deterministic, warn_only=warn_only)
 
 
 def log_progress(message: str) -> None:
@@ -327,7 +332,7 @@ def build_training_configuration_table(config: ExperimentConfig) -> pd.DataFrame
             "PatienceOrEarlyStop": int(config.dnn_patience),
             "SelectionMetric": "val_rmse",
             "OptimizerOrBackend": "AdamW",
-            "Notes": "MLP with SmoothL1 loss and best-state restore",
+            "Notes": "MLP with SmoothL1 loss, best-state restore, deterministic loader seed",
         },
         {
             "Model": "TFT",
@@ -339,7 +344,7 @@ def build_training_configuration_table(config: ExperimentConfig) -> pd.DataFrame
             "PatienceOrEarlyStop": int(config.tft_patience),
             "SelectionMetric": "val_loss",
             "OptimizerOrBackend": "PyTorch Forecasting / Lightning",
-            "Notes": "best checkpoint restored after early stopping",
+            "Notes": "deterministic Lightning run with best checkpoint restore",
         },
         {
             "Model": "AdaptiveBlend",
@@ -351,7 +356,7 @@ def build_training_configuration_table(config: ExperimentConfig) -> pd.DataFrame
             "PatienceOrEarlyStop": int(config.adaptive_patience),
             "SelectionMetric": "holdout_mae",
             "OptimizerOrBackend": "AdamW",
-            "Notes": "neural gating on validation holdout split",
+            "Notes": "neural gating on validation holdout split with deterministic loader seed",
         },
         {
             "Model": "StackedXGB",
@@ -483,7 +488,11 @@ def run_single_experiment(
     prepared_data: PreparedData | None = None,
     include_ablations: bool = True,
 ) -> ExperimentArtifacts:
-    set_seed(config.random_seed)
+    set_seed(
+        config.random_seed,
+        deterministic=config.deterministic_training,
+        warn_only=config.deterministic_warn_only,
+    )
     prepared = prepared_data if prepared_data is not None else load_and_prepare_data(config)
     log_progress(f"Running experiment with seed={config.random_seed}.")
     print("CUDA available:", torch.cuda.is_available(), flush=True)

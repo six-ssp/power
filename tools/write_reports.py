@@ -70,8 +70,8 @@ def main() -> None:
         .reset_index()
     )
     ablation_focus = ablation[
-        ablation["Variant"].isin(["Full Hybrid", "w/o Physics", "w/o Plant Adaptation", "w/o Scene Adaptation"])
-    ][["Variant", "MAE", "RMSE"]].copy()
+        ablation["Model"].isin(["Full Hybrid", "w/o Physics", "w/o Plant Adaptation", "w/o Scene Adaptation"])
+    ][["Model", "MAE", "RMSE"]].copy()
 
     hybrid_mae = get_metric(baseline, "Hybrid", "MAE")
     tft_mae = get_metric(baseline, "TFT", "MAE")
@@ -117,6 +117,7 @@ def main() -> None:
 
 ## 4. 当前训练口径
 - 神经模型统一提升到 `30` 轮预算量级，同时保留 early stopping 和 best checkpoint restore。
+- 当前默认启用 deterministic training，并在复现模式下将 DataLoader worker 固定为单线程。
 - `TFT` 采用 `bf16-mixed` 混合精度，以在 `8 GB` 级显存条件下支撑更高训练预算。
 - 树模型继续使用 boosting rounds + early stopping，不强行改成固定轮数。
 - 这套设置的重点是释放公平预算，而不是机械地让所有模型跑满相同轮数。

@@ -82,6 +82,42 @@
     "artifacts\\reports\\paper_reference_draft_zh.md": true,
     "artifacts\\paper_figures\\method_framework.png": true
   },
+  "dataset_status": {
+    "manifest_exists": true,
+    "all_match": true,
+    "files": [
+      {
+        "path": "dataset/data_1A.csv",
+        "exists": true,
+        "size_ok": true,
+        "sha_ok": true
+      },
+      {
+        "path": "dataset/data_1C.csv",
+        "exists": true,
+        "size_ok": true,
+        "sha_ok": true
+      },
+      {
+        "path": "dataset/data_3A.csv",
+        "exists": true,
+        "size_ok": true,
+        "sha_ok": true
+      },
+      {
+        "path": "dataset/data_4A.csv",
+        "exists": true,
+        "size_ok": true,
+        "sha_ok": true
+      }
+    ]
+  },
+  "release_match": {
+    "match": true,
+    "missing": [],
+    "unexpected": [],
+    "mismatched": []
+  },
   "checks": {
     "project_files_complete": true,
     "artifact_files_complete": true,
@@ -104,6 +140,8 @@
     "rolling_origin_non_null": true,
     "training_config_non_null": true,
     "training_execution_non_null": true,
+    "dataset_hash_matches_parts_manifest": true,
+    "published_results_match_manifest": true,
     "cuda_available": true
   }
 }

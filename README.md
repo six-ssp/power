@@ -94,6 +94,8 @@ The exported training budget and actual executed epochs or rounds are stored in:
 - `artifacts/metrics/training_configuration.csv`
 - `artifacts/metrics/training_execution_summary.csv`
 
+For release reproducibility, the project now enables deterministic training mode by default, uses single-worker data loading in reproducibility mode, and records a published results signature in `artifacts/checks/published_results_manifest.json`.
+
 ## Data Schema
 
 All dataset files use English column names:
@@ -176,6 +178,8 @@ Rebuild split parts from local raw CSV files:
 |-- tools/
 |   |-- split_dataset_parts.py
 |   |-- merge_dataset_parts.py
+|   |-- reproducibility.py
+|   |-- reproduce_release.py
 |   |-- staged_runner.py
 |   |-- write_reports.py
 |   |-- generate_paper_figures.py
@@ -210,18 +214,27 @@ Long-running stages can also be refreshed separately:
 
 ```powershell
 .\.venv\Scripts\python tools\staged_runner.py main
+.\.venv\Scripts\python tools\staged_runner.py rolling-window --index 1
 .\.venv\Scripts\python tools\staged_runner.py rolling-window --index 2
 .\.venv\Scripts\python tools\staged_runner.py rolling-window --index 3
 ```
 
-### 3. Rebuild reports and paper figures
+### 3. Cleanly reproduce the published release
+
+```powershell
+.\.venv\Scripts\python tools\reproduce_release.py
+```
+
+This command restores the dataset from `dataset_parts/` if needed, clears stale release outputs, reruns the staged experiment pipeline, regenerates reports and figures, and compares the resulting files against `artifacts/checks/published_results_manifest.json`.
+
+### 4. Rebuild reports and paper figures
 
 ```powershell
 .\.venv\Scripts\python tools\write_reports.py
 .\.venv\Scripts\python tools\generate_paper_figures.py
 ```
 
-### 4. Verify generated artifacts
+### 5. Verify generated artifacts
 
 ```powershell
 .\.venv\Scripts\python tools\verify_project.py
@@ -242,6 +255,8 @@ Long-running stages can also be refreshed separately:
 - Verified environment: `Python 3.12`, CUDA available, GPU PyTorch runtime
 - Main entry: `run_experiments.py`
 - Staged reruns: `tools/staged_runner.py`
+- Release reproduction: `tools/reproduce_release.py`
 - Report regeneration: `tools/write_reports.py`
 - Project verification: `tools/verify_project.py`
+- `tools/verify_project.py` now checks both dataset hashes against `dataset_parts/manifest.json` and result hashes against `artifacts/checks/published_results_manifest.json`
 - The current README reflects the latest generated artifacts in `artifacts/`

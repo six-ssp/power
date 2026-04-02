@@ -1,0 +1,126 @@
+{
+  "format_version": 1,
+  "created_at_utc": "2026-04-02T13:35:59.015960+00:00",
+  "files": [
+    {
+      "path": "artifacts/metrics/baseline_metrics.csv",
+      "exists": true,
+      "size": 1272,
+      "sha256": "ba1a7efdc0debb84424641370312dfc05fc878e47b7eb1e017ea6540d6f5d51f"
+    },
+    {
+      "path": "artifacts/metrics/ablation_metrics.csv",
+      "exists": true,
+      "size": 1666,
+      "sha256": "54dc1d61e80c7a9541086f4470c2191878939212613271fd609406ce5179d465"
+    },
+    {
+      "path": "artifacts/metrics/plant_level_metrics.csv",
+      "exists": true,
+      "size": 5675,
+      "sha256": "d190c3e40dab79881fdbe43f7e1e769d552dd31d362de99756f45c4d96f92eec"
+    },
+    {
+      "path": "artifacts/metrics/baseline_daytime_metrics.csv",
+      "exists": true,
+      "size": 1270,
+      "sha256": "ea26d8a6bfcbdd233e2fab721ccb2d3e55ae97ed7b627aa28ad2bc8d5a859fd9"
+    },
+    {
+      "path": "artifacts/metrics/baseline_physical_metrics.csv",
+      "exists": true,
+      "size": 898,
+      "sha256": "0d9653d72c63f9511e176255702b90775ab6fcdcb96e7ecce383ac717798ef4b"
+    },
+    {
+      "path": "artifacts/metrics/plant_level_daytime_metrics.csv",
+      "exists": true,
+      "size": 5602,
+      "sha256": "60f3a91b988a16787c62ab1df47dae35026e257f5e2dd5e20b5f4e7d753c190b"
+    },
+    {
+      "path": "artifacts/metrics/plant_level_physical_metrics.csv",
+      "exists": true,
+      "size": 3263,
+      "sha256": "3c3f995845eae5dcefc58633ac09b8401ba52f4132b55d9ce0415032d3bbd56b"
+    },
+    {
+      "path": "artifacts/metrics/subset_counts.csv",
+      "exists": true,
+      "size": 111,
+      "sha256": "2462ba1410d1b6b70b505689cee3e366fefc5d4ed6782e5e64c9a539d2ab03ba"
+    },
+    {
+      "path": "artifacts/metrics/seed_repeat_metrics.csv",
+      "exists": true,
+      "size": 3741,
+      "sha256": "1076776523764b858bab1348b61dc156eb7feafd8704e4f031986333e59833a0"
+    },
+    {
+      "path": "artifacts/metrics/seed_repeat_summary.csv",
+      "exists": true,
+      "size": 2574,
+      "sha256": "2b08d9071a806e12563445ff8cc02153c7da32f2d05df05f73e07de532dfbe6f"
+    },
+    {
+      "path": "artifacts/metrics/rolling_origin_metrics.csv",
+      "exists": true,
+      "size": 4090,
+      "sha256": "2d1749620cdff79bcbfdafcafc837925d03808e61f8d3af1f31dc6ecd57b5872"
+    },
+    {
+      "path": "artifacts/metrics/rolling_origin_summary.csv",
+      "exists": true,
+      "size": 2769,
+      "sha256": "3136601b3d805db0d7ab3c05b9c184da8d36a1554726f5db91be711cfeba24fe"
+    },
+    {
+      "path": "artifacts/metrics/rolling_origin_windows.csv",
+      "exists": true,
+      "size": 766,
+      "sha256": "60f6a00f19a1794741cdc635e1d88f3eace6dbac86085e14c76a2963c2b0de43"
+    },
+    {
+      "path": "artifacts/metrics/training_configuration.csv",
+      "exists": true,
+      "size": 789,
+      "sha256": "a2d7231193e9c9937b78a64daca8b94f8a0b0b793b2f3425e51669832bf61a45"
+    },
+    {
+      "path": "artifacts/metrics/training_execution_summary.csv",
+      "exists": true,
+      "size": 411,
+      "sha256": "b25ecfe5bceeba1f4a9ae537bb93ed2328abf02b80103fda8c96cc1f32fffcbf"
+    },
+    {
+      "path": "artifacts/reports/training_setup_zh.md",
+      "exists": true,
+      "size": 2442,
+      "sha256": "2999da60289147f3cc53b8bf03822a69e4bd3ff567be3ee5e45751db367306e4"
+    },
+    {
+      "path": "artifacts/reports/result_summary_zh.md",
+      "exists": true,
+      "size": 1988,
+      "sha256": "2ba6c60d5c8119c989320fb4f2097e9db25361bc4665fbae5312b8fd260fee3d"
+    },
+    {
+      "path": "artifacts/reports/robustness_summary_zh.md",
+      "exists": true,
+      "size": 3214,
+      "sha256": "d9a0393b68d4edfd76fce79c0bcd11bc91569d43067e4b88cc2bca187e3b5776"
+    },
+    {
+      "path": "artifacts/reports/sdm_positioning_zh.md",
+      "exists": true,
+      "size": 1557,
+      "sha256": "3adb83eabac4f2d6c1b969aa07ab589fed89641b04e1d0ce4647f74445728878"
+    },
+    {
+      "path": "artifacts/reports/paper_reference_draft_zh.md",
+      "exists": true,
+      "size": 12139,
+      "sha256": "a588f2c37afa1dd51b6e80c3dc8a547cbe4febb489d4618173d7b25f97e813b1"
+    }
+  ]
+}

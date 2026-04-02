@@ -7,6 +7,9 @@ __pycache__/
 dataset/
 
 artifacts/logs/
+artifacts/tmp_restore/
+artifacts/checks/current_results_manifest.json
+artifacts/checks/reproduction_check_zh.md
 artifacts/metrics/test_predictions.csv
 artifacts/metrics/validation_predictions.csv
 

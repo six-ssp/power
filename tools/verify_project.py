@@ -14,6 +14,12 @@ if str(PROJECT_DIR) not in sys.path:
 
 from pvbench import ExperimentConfig, load_and_prepare_data
 from pvbench.data import build_tabular_matrices
+from tools.reproducibility import (
+    build_results_manifest,
+    compare_results_manifests,
+    save_results_manifest,
+    verify_dataset_against_parts,
+)
 
 
 def main() -> None:
@@ -86,6 +92,16 @@ def main() -> None:
     rolling_window_table = pd.read_csv(artifacts_dir / 'metrics' / 'rolling_origin_windows.csv')
     training_config_table = pd.read_csv(artifacts_dir / 'metrics' / 'training_configuration.csv')
     training_execution_table = pd.read_csv(artifacts_dir / 'metrics' / 'training_execution_summary.csv')
+    dataset_status = verify_dataset_against_parts(project_dir)
+
+    published_manifest_path = checks_dir / 'published_results_manifest.json'
+    current_manifest_path = checks_dir / 'current_results_manifest.json'
+    current_manifest = build_results_manifest(project_dir)
+    save_results_manifest(current_manifest_path, current_manifest)
+    release_match = None
+    if published_manifest_path.exists():
+        published_manifest = json.loads(published_manifest_path.read_text(encoding='utf-8'))
+        release_match = compare_results_manifests(published_manifest, current_manifest)
 
     expected_baseline_models = {'Persistence', 'XGBoost', 'DNN', 'TFT', 'Hybrid', 'AdaptiveBlend', 'StackedXGB'}
     expected_ablation_models = {
@@ -128,6 +144,8 @@ def main() -> None:
         'rolling_origin_non_null': not rolling_origin_summary.isna().any().any(),
         'training_config_non_null': not training_config_table.isna().any().any(),
         'training_execution_non_null': not training_execution_table.isna().any().any(),
+        'dataset_hash_matches_parts_manifest': bool(dataset_status['all_match']),
+        'published_results_match_manifest': bool(release_match['match']) if release_match is not None else False,
         'cuda_available': torch.cuda.is_available(),
     }
 
@@ -150,8 +168,14 @@ def main() -> None:
         'test_matrix_shape': test_x.shape,
         'project_file_status': project_file_status,
         'artifact_status': artifact_status,
+        'dataset_status': dataset_status,
+        'release_match': release_match,
         'checks': checks,
     }
+
+    release_status_text = "未检查"
+    if release_match is not None:
+        release_status_text = "是" if checks['published_results_match_manifest'] else "否"
 
     (checks_dir / 'project_check.json').write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding='utf-8')
 
@@ -164,6 +188,8 @@ def main() -> None:
         f"- 数据处理链路可加载：`是`",
         f"- Baseline/消融结果表结构正确：`{'是' if checks['baseline_models_complete'] and checks['ablation_models_complete'] else '否'}`",
         f"- GPU 环境可用：`{'是' if checks['cuda_available'] else '否'}`",
+        f"- 数据集哈希匹配分片清单：`{'是' if checks['dataset_hash_matches_parts_manifest'] else '否'}`",
+        f"- 当前结果匹配发布签名：`{release_status_text}`",
         '',
         '## 2. 当前确认无误的内容',
         '- 原始数据文件存在，且表头与电站 ID 已统一为英文。',
@@ -172,6 +198,7 @@ def main() -> None:
         '- `baseline_daytime_metrics.csv / baseline_physical_metrics.csv / seed_repeat_summary.csv / rolling_origin_summary.csv` 已生成。',
         '- `README.md`、训练配置记录、SDM 口径说明、参考稿、鲁棒性记录和主要图表已经生成。',
         '- 代码可完成数据加载、特征工程与监督样本构建。',
+        '- 当前检查会额外对 `dataset_parts/manifest.json` 和发布结果签名做一致性比对。',
         '',
         '## 3. 可复现性说明',
         '- 当前环境：Python 3.12 + CUDA 可用 + GPU 版 PyTorch。',

@@ -181,7 +181,15 @@ HYBRID_SCENE_NAMES = ("night", "low_radiation", "mid_radiation", "high_radiation
 
 
 def resolve_loader_workers(config: ExperimentConfig) -> int:
+    if config.deterministic_training:
+        return max(0, config.deterministic_num_workers)
     return max(0, config.num_workers)
+
+
+def build_loader_generator(seed: int, offset: int = 0) -> torch.Generator:
+    generator = torch.Generator()
+    generator.manual_seed(seed + offset)
+    return generator
 
 
 def fit_xgboost(
@@ -246,6 +254,7 @@ def fit_dnn(
         TensorDataset(torch.from_numpy(x_train), torch.from_numpy(y_train)),
         batch_size=config.dnn_batch_size,
         shuffle=True,
+        generator=build_loader_generator(config.random_seed, offset=11),
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         persistent_workers=num_workers > 0,
@@ -326,6 +335,7 @@ def fit_dnn(
 
 
 def fit_tft(prepared_data: PreparedData, config: ExperimentConfig) -> TFTResult:
+    pl.seed_everything(config.random_seed, workers=True)
     raw_frame = prepared_data.raw_frame.copy()
     training_frame = raw_frame[raw_frame["time_idx"] <= prepared_data.train_cutoff]
     validation_frame = raw_frame[raw_frame["time_idx"] <= prepared_data.val_cutoff]
@@ -367,6 +377,7 @@ def fit_tft(prepared_data: PreparedData, config: ExperimentConfig) -> TFTResult:
     train_loader = training_dataset.to_dataloader(
         train=True,
         batch_size=config.tft_batch_size,
+        generator=build_loader_generator(config.random_seed, offset=21),
         num_workers=num_workers,
         persistent_workers=num_workers > 0,
     )
@@ -421,6 +432,8 @@ def fit_tft(prepared_data: PreparedData, config: ExperimentConfig) -> TFTResult:
         gradient_clip_val=config.tft_gradient_clip_val,
         callbacks=[early_stop, checkpoint_callback],
         num_sanity_val_steps=0,
+        deterministic=config.deterministic_training,
+        benchmark=False,
     )
     trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)
 
@@ -952,6 +965,7 @@ def fit_adaptive_blend(
         ),
         batch_size=config.adaptive_batch_size,
         shuffle=True,
+        generator=build_loader_generator(config.random_seed, offset=31),
         num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         persistent_workers=num_workers > 0,

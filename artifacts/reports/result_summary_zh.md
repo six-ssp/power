@@ -25,13 +25,21 @@
 ## 3. Physical Violation
 | Model | PhysicalViolationRate | NegativeRate | NightPositiveRateOnNight |
 | --- | --- | --- | --- |
-| DNN | 0.099240 | 0.099192 | 0.000093 |
-| TFT | 0.000008 | 0.000008 | 0.000000 |
 | Hybrid | 0.000508 | 0.000492 | 0.000031 |
+| TFT | 0.000008 | 0.000008 | 0.000000 |
 | StackedXGB | 0.000016 | 0.000000 | 0.000031 |
+| DNN | 0.099240 | 0.099192 | 0.000093 |
 
-## 4. 结论
+## 4. Hybrid 消融
+| Model | MAE | RMSE |
+| --- | --- | --- |
+| Full Hybrid | 0.021530 | 0.064468 |
+| w/o Physics | 0.021750 | 0.064474 |
+| w/o Plant Adaptation | 0.021745 | 0.064162 |
+| w/o Scene Adaptation | 0.023153 | 0.066229 |
+
+## 5. 结论
 - 固定切分下，`Hybrid` 的 MAE 为 `0.021530`，优于 `TFT` 的 `0.026838` 和 `StackedXGB` 的 `0.029018`。
 - `daytime-only` 下，`Hybrid` 的 MAE 为 `0.043451`，同样优于 `TFT` 的 `0.053429` 与 `StackedXGB` 的 `0.052496`。
-- 在 physical violation 上，`TFT` 与 `StackedXGB` 的违例率最低，`Hybrid` 仍维持在低违例水平，显著优于 `DNN`。
-- 当前最稳的主叙事是：`Hybrid` 提供最强的综合预测性能与解释性，`TFT` 是更充分训练后的深度时序强基线，`StackedXGB` 是重要但不占主叙事中心的元学习对照。
+- physical violation rate 显示：`Hybrid` 不是约束一致性最优，但仍维持低违例水平，并显著好于 `DNN`。
+- 当前最稳的主叙事是：`Hybrid` 提供了最强的综合预测表现，`TFT` 是更充分训练后的深度时序强基线，`StackedXGB` 是重要但不占主叙事中心的元学习对照。

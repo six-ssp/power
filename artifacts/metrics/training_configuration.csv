@@ -1,6 +1,6 @@
 ﻿Model,Role,TrainingUnit,MaxEpochsOrRounds,BatchSize,LearningRate,PatienceOrEarlyStop,SelectionMetric,OptimizerOrBackend,Notes
 XGBoost,base learner,boosting rounds,300,-,0.05,30,val_rmse,XGBoost hist,tree ensemble with validation early stopping
-DNN,base learner,epochs,30,8192,0.001,5,val_rmse,AdamW,MLP with SmoothL1 loss and best-state restore
-TFT,base learner,epochs,30,6144,0.0005,5,val_loss,PyTorch Forecasting / Lightning,best checkpoint restored after early stopping
-AdaptiveBlend,meta learner,epochs,30,16384,0.0003,6,holdout_mae,AdamW,neural gating on validation holdout split
+DNN,base learner,epochs,30,8192,0.001,5,val_rmse,AdamW,"MLP with SmoothL1 loss, best-state restore, deterministic loader seed"
+TFT,base learner,epochs,30,6144,0.0005,5,val_loss,PyTorch Forecasting / Lightning,deterministic Lightning run with best checkpoint restore
+AdaptiveBlend,meta learner,epochs,30,16384,0.0003,6,holdout_mae,AdamW,neural gating on validation holdout split with deterministic loader seed
 StackedXGB,meta learner,boosting rounds,600,-,0.03,50,holdout_rmse,XGBoost hist,stacking regressor on validation holdout split

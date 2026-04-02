@@ -10,9 +10,9 @@
 | Model | Role | TrainingUnit | MaxEpochsOrRounds | BatchSize | LearningRate | PatienceOrEarlyStop | SelectionMetric | OptimizerOrBackend | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | XGBoost | base learner | boosting rounds | 300 | - | 0.050000 | 30 | val_rmse | XGBoost hist | tree ensemble with validation early stopping |
-| DNN | base learner | epochs | 30 | 8192 | 0.001000 | 5 | val_rmse | AdamW | MLP with SmoothL1 loss and best-state restore |
-| TFT | base learner | epochs | 30 | 6144 | 0.000500 | 5 | val_loss | PyTorch Forecasting / Lightning | best checkpoint restored after early stopping |
-| AdaptiveBlend | meta learner | epochs | 30 | 16384 | 0.000300 | 6 | holdout_mae | AdamW | neural gating on validation holdout split |
+| DNN | base learner | epochs | 30 | 8192 | 0.001000 | 5 | val_rmse | AdamW | MLP with SmoothL1 loss, best-state restore, deterministic loader seed |
+| TFT | base learner | epochs | 30 | 6144 | 0.000500 | 5 | val_loss | PyTorch Forecasting / Lightning | deterministic Lightning run with best checkpoint restore |
+| AdaptiveBlend | meta learner | epochs | 30 | 16384 | 0.000300 | 6 | holdout_mae | AdamW | neural gating on validation holdout split with deterministic loader seed |
 | StackedXGB | meta learner | boosting rounds | 600 | - | 0.030000 | 50 | holdout_rmse | XGBoost hist | stacking regressor on validation holdout split |
 
 ## 3. 主实验实际执行轮次
@@ -26,6 +26,7 @@
 
 ## 4. 当前训练口径
 - 神经模型统一提升到 `30` 轮预算量级，同时保留 early stopping 和 best checkpoint restore。
+- 当前默认启用 deterministic training，并在复现模式下将 DataLoader worker 固定为单线程。
 - `TFT` 采用 `bf16-mixed` 混合精度，以在 `8 GB` 级显存条件下支撑更高训练预算。
 - 树模型继续使用 boosting rounds + early stopping，不强行改成固定轮数。
-- 该训练设置的目标不是机械地让所有模型跑满相同轮数，而是在统一预算上限下给出更公平的容量释放。
+- 这套设置的重点是释放公平预算，而不是机械地让所有模型跑满相同轮数。
