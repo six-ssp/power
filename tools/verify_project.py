@@ -44,8 +44,10 @@ def main() -> None:
         artifacts_dir / 'metrics' / 'plant_level_metrics.csv',
         artifacts_dir / 'metrics' / 'baseline_daytime_metrics.csv',
         artifacts_dir / 'metrics' / 'baseline_physical_metrics.csv',
+        artifacts_dir / 'metrics' / 'baseline_bvp_metrics.csv',
         artifacts_dir / 'metrics' / 'plant_level_daytime_metrics.csv',
         artifacts_dir / 'metrics' / 'plant_level_physical_metrics.csv',
+        artifacts_dir / 'metrics' / 'ablation_bvp_metrics.csv',
         artifacts_dir / 'metrics' / 'subset_counts.csv',
         artifacts_dir / 'metrics' / 'seed_repeat_metrics.csv',
         artifacts_dir / 'metrics' / 'seed_repeat_summary.csv',
@@ -85,8 +87,10 @@ def main() -> None:
     plant_table = pd.read_csv(artifacts_dir / 'metrics' / 'plant_level_metrics.csv')
     baseline_daytime_table = pd.read_csv(artifacts_dir / 'metrics' / 'baseline_daytime_metrics.csv')
     baseline_physical_table = pd.read_csv(artifacts_dir / 'metrics' / 'baseline_physical_metrics.csv')
+    baseline_bvp_table = pd.read_csv(artifacts_dir / 'metrics' / 'baseline_bvp_metrics.csv')
     plant_daytime_table = pd.read_csv(artifacts_dir / 'metrics' / 'plant_level_daytime_metrics.csv')
     plant_physical_table = pd.read_csv(artifacts_dir / 'metrics' / 'plant_level_physical_metrics.csv')
+    ablation_bvp_table = pd.read_csv(artifacts_dir / 'metrics' / 'ablation_bvp_metrics.csv')
     seed_repeat_summary = pd.read_csv(artifacts_dir / 'metrics' / 'seed_repeat_summary.csv')
     rolling_origin_summary = pd.read_csv(artifacts_dir / 'metrics' / 'rolling_origin_summary.csv')
     rolling_window_table = pd.read_csv(artifacts_dir / 'metrics' / 'rolling_origin_windows.csv')
@@ -130,8 +134,10 @@ def main() -> None:
         'plant_results_complete': set(plant_table['Plant']) == expected_plants,
         'daytime_models_complete': set(baseline_daytime_table['Model']) == expected_baseline_models,
         'physical_models_complete': set(baseline_physical_table['Model']) == expected_baseline_models,
+        'bvp_models_complete': set(baseline_bvp_table['Model']) == expected_baseline_models,
         'daytime_plants_complete': set(plant_daytime_table['Plant']) == expected_plants,
         'physical_plants_complete': set(plant_physical_table['Plant']) == expected_plants,
+        'ablation_bvp_models_complete': set(ablation_bvp_table['Model']) == expected_ablation_models,
         'seed_summary_models_complete': set(seed_repeat_summary['Model']) == expected_baseline_models,
         'rolling_summary_models_complete': set(rolling_origin_summary['Model']) == expected_baseline_models,
         'rolling_window_count_correct': len(rolling_window_table) == len(config.rolling_origin_windows),
@@ -140,6 +146,8 @@ def main() -> None:
         'plant_metrics_non_null': not plant_table.isna().any().any(),
         'daytime_metrics_non_null': not baseline_daytime_table.isna().any().any(),
         'physical_metrics_non_null': not baseline_physical_table.isna().any().any(),
+        'bvp_metrics_non_null': not baseline_bvp_table.isna().any().any(),
+        'ablation_bvp_non_null': not ablation_bvp_table.isna().any().any(),
         'seed_repeat_non_null': not seed_repeat_summary.isna().any().any(),
         'rolling_origin_non_null': not rolling_origin_summary.isna().any().any(),
         'training_config_non_null': not training_config_table.isna().any().any(),
@@ -195,7 +203,7 @@ def main() -> None:
         '- 原始数据文件存在，且表头与电站 ID 已统一为英文。',
         '- 主实验入口、配置、数据处理、模型与报告模块均存在。',
         '- `baseline_metrics.csv / ablation_metrics.csv / plant_level_metrics.csv` 已生成。',
-        '- `baseline_daytime_metrics.csv / baseline_physical_metrics.csv / seed_repeat_summary.csv / rolling_origin_summary.csv` 已生成。',
+        '- `baseline_daytime_metrics.csv / baseline_physical_metrics.csv / baseline_bvp_metrics.csv / seed_repeat_summary.csv / rolling_origin_summary.csv` 已生成。',
         '- `README.md`、训练配置记录、SDM 口径说明、参考稿、鲁棒性记录和主要图表已经生成。',
         '- 代码可完成数据加载、特征工程与监督样本构建。',
         '- 当前检查会额外对 `dataset_parts/manifest.json` 和发布结果签名做一致性比对。',
@@ -213,7 +221,7 @@ def main() -> None:
         [
             '- 新版 Hybrid 已改为电站级场景融合，并额外保留固定权重版本作为消融对照。',
             '- StackedXGB 仍是重要对照，但主线 Hybrid 现在具备更强的可解释性。',
-        '- 项目现在额外提供 daytime-only、physical violation、多随机种子和 rolling-origin 四类评估结果。',
+            '- 项目现在额外提供 daytime-only、physical violation、BVP、多随机种子和 rolling-origin 五类评估结果。',
             '- 训练配置与实际执行轮次已导出为独立表格，可直接写入论文实验设置。',
             '',
             '## 5. 数据与特征规模',

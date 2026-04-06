@@ -1,7 +1,7 @@
 ﻿# Scene-Aware Interpretable Fusion with Constraint-Aware Evaluation for Heterogeneous PV Time-Series Mining
 
 ## 摘要
-本文将异构光伏装置上的 `5-minute-ahead` 功率预测问题表述为一个带已知未来外生变量的异构时间序列数据挖掘任务。围绕这一设定，本文构建了一套可复现实验流水线，并提出一种按电站与辐照场景切换权重的可解释融合方法 `Hybrid`。该方法在 `XGBoost`、`DNN` 和 `TFT` 三类异构基学习器之上进行结构化融合，并保留轻量物理后修正以抑制不合理输出。实验基于 Alice Springs 站点四个异构光伏装置，采用时间顺序切分、`6` 小时间隔保护、`daytime-only`、多随机种子和 rolling-origin 评估。结果表明，固定切分下 `Hybrid` 将 `TFT` 的 MAE 从 `0.026838` 降至 `0.021530`；在白天子集上，`Hybrid` 的 MAE 为 `0.043451`，优于 `TFT` 的 `0.053429`。在多随机种子和 rolling-origin 下，`Hybrid` 仍保持最低平均 MAE。进一步引入 physical violation rate 后，结果显示 `Hybrid` 在精度、稳定性与物理一致性之间取得了更平衡的表现。
+本文将异构光伏装置上的 `5-minute-ahead` 功率预测问题表述为一个带已知未来外生变量的异构时间序列数据挖掘任务。围绕这一设定，本文构建了一套可复现实验流水线，并提出一种按电站与辐照场景切换权重的可解释融合方法 `Hybrid`。该方法在 `XGBoost`、`DNN` 和 `TFT` 三类异构基学习器之上进行结构化融合，并保留轻量物理后修正以抑制不合理输出。实验基于 Alice Springs 站点四个异构光伏装置，采用时间顺序切分、`6` 小时间隔保护、`daytime-only`、多随机种子和 rolling-origin 评估。结果表明，固定切分下 `Hybrid` 将 `TFT` 的 MAE 从 `0.026838` 降至 `0.021530`；在白天子集上，`Hybrid` 的 MAE 为 `0.043451`，优于 `TFT` 的 `0.053429`。在多随机种子和 rolling-origin 下，`Hybrid` 仍保持最低平均 MAE。进一步引入 physical violation rate 与 `BVP` 后，结果显示 `Hybrid` 在精度、稳定性与物理一致性之间取得了更平衡的表现。
 
 ## 关键词
 光伏预测；异构时间序列；可解释融合；场景自适应；constraint-aware evaluation
@@ -26,7 +26,7 @@
 `Hybrid` 的核心机制是按场景和电站分解权重。对于每一个样本，先根据辐照水平归入场景，再调用该电站在该场景下的融合权重，对三个基学习器的输出做加权。这样得到的结果具有直接可解释性：权重本身就是“在该电站、该场景下更相信谁”的显式表达。
 
 ### 3.3 Constraint-Aware Evaluation
-为了避免只用误差指标评估，本文引入 physical violation rate。当前版本使用两类最硬的违例：
+为了避免只用误差指标评估，本文引入 physical violation rate 与 `BVP`。当前版本使用两类最硬的违例：
 - 负功率违例：预测值小于 `-epsilon_p`；
 - 夜间正功率违例：夜间样本的预测值大于 `epsilon_p`。
 
@@ -36,7 +36,14 @@
 PVR = (1 / N) * sum I[y_hat_t < -epsilon_p or (night_t = 1 and y_hat_t > epsilon_p)]
 ```
 
-这个指标不把 `Hybrid` 强行包装成约束优化模型，但确实给出了更接近 `SDM` 口径的 constraint-aware evaluation。
+同时，定义夜间/极低辐射集合
+
+```text
+Omega_bvp = {t | elevation_t <= 0 or G_t <= R_th}
+BVP = sum_{t in Omega_bvp} max(y_hat_t, 0)
+```
+
+其中 `R_th=20.0`。`BVP` 直接度量模型在物理上本该接近 `0` 的时段里错误输出了多少正向能量，更适合用于论证 Physics Adjustment 的贡献。
 
 ## 4. 实验设计
 ### 4.1 数据与任务
@@ -104,7 +111,14 @@ PVR = (1 / N) * sum I[y_hat_t < -epsilon_p or (night_t = 1 and y_hat_t > epsilon
 | StackedXGB | 0.000016 | 0.000000 | 0.000031 |
 | DNN | 0.099240 | 0.099192 | 0.000093 |
 
-这一结果提供了与 `SDM` 更契合的补充证据：模型不仅要低误差，还要尽量少地产生负功率或夜间异常正功率。`Hybrid` 的违例率保持较低，显著好于 `DNN`，但仍高于 `TFT` 与 `StackedXGB`。因此更稳的结论不是“`Hybrid` 在所有约束一致性指标上最优”，而是“`Hybrid` 在预测精度与约束一致性之间取得更优平衡”。
+| Model | BVP | BVPMean | BVPMAE |
+| --- | --- | --- | --- |
+| Hybrid | 82.801440 | 0.001228 | 0.002170 |
+| TFT | 138.271500 | 0.002051 | 0.002817 |
+| StackedXGB | 537.819166 | 0.007976 | 0.007798 |
+| DNN | 40.385780 | 0.000599 | 0.019131 |
+
+这一结果提供了与 `SDM` 更契合的补充证据：模型不仅要低误差，还要尽量少地产生负功率、夜间异常正功率以及不可行域上的正向能量泄漏。`Hybrid` 的违例率保持较低，显著好于 `DNN`，但仍高于 `TFT` 与 `StackedXGB`。另一方面，`Hybrid` 在 `BVP` 上为 `82.801440`，明显低于 `w/o Physics` 的 `110.053723`，说明 Physics Adjustment 的主要收益确实体现在夜间/极低辐照样本。更稳的结论不是“`Hybrid` 在所有约束一致性指标上最优”，而是“`Hybrid` 在预测精度与约束一致性之间取得更优平衡”。
 
 ### 5.4 消融与鲁棒性
 | Model | MAE | RMSE |
@@ -113,6 +127,13 @@ PVR = (1 / N) * sum I[y_hat_t < -epsilon_p or (night_t = 1 and y_hat_t > epsilon
 | w/o Physics | 0.021750 | 0.064474 |
 | w/o Plant Adaptation | 0.021745 | 0.064162 |
 | w/o Scene Adaptation | 0.023153 | 0.066229 |
+
+| Model | BVP | BVPMean | BVPMAE |
+| --- | --- | --- | --- |
+| Full Hybrid | 82.801440 | 0.001228 | 0.002170 |
+| w/o Physics | 110.053723 | 0.001632 | 0.002575 |
+| w/o Plant Adaptation | 80.853938 | 0.001199 | 0.002136 |
+| w/o Scene Adaptation | 62.286833 | 0.000924 | 0.003651 |
 
 | Model | Runs | MAE | RMSE | R2 |
 | --- | --- | --- | --- | --- |
@@ -146,7 +167,7 @@ PVR = (1 / N) * sum I[y_hat_t < -epsilon_p or (night_t = 1 and y_hat_t > epsilon
 ## 7. 局限性
 - 数据范围仍局限于同一站点的四个异构装置，跨站点外推能力尚未验证。
 - 当前任务是单步预测，尚未扩展到多步预测或更长时间尺度。
-- constraint-aware 指标目前聚焦于负功率和夜间异常正功率，尚未进一步扩展到更强的清空包络或 ramp-rate 约束。
+- constraint-aware 指标目前聚焦于负功率、夜间异常正功率和不可行域正向能量泄漏，尚未进一步扩展到更强的清空包络或 ramp-rate 约束。
 
 ## 8. 结论
-当前这套实验最适合形成如下论文主线：在异构光伏时间序列上，单一强基线难以覆盖所有场景，而场景自适应、结构化、可解释的融合能够在精度、稳定性和物理合理性之间取得更优平衡。就现有结果而言，`Hybrid` 是主方法，`TFT` 是更强后的深度时序基线，physical violation 则为全文补上了更符合 `SDM` 口味的 constraint-aware 评价维度。
+当前这套实验最适合形成如下论文主线：在异构光伏时间序列上，单一强基线难以覆盖所有场景，而场景自适应、结构化、可解释的融合能够在精度、稳定性和物理合理性之间取得更优平衡。就现有结果而言，`Hybrid` 是主方法，`TFT` 是更强后的深度时序基线，physical violation 与 `BVP` 则为全文补上了更符合 `SDM` 口味的 constraint-aware 评价维度。

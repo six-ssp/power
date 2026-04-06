@@ -54,7 +54,9 @@ def main() -> None:
     baseline = pd.read_csv(metric_dir / "baseline_metrics.csv")
     daytime = pd.read_csv(metric_dir / "baseline_daytime_metrics.csv")
     physical = pd.read_csv(metric_dir / "baseline_physical_metrics.csv")
+    baseline_bvp = pd.read_csv(metric_dir / "baseline_bvp_metrics.csv")
     ablation = pd.read_csv(metric_dir / "ablation_metrics.csv")
+    ablation_bvp = pd.read_csv(metric_dir / "ablation_bvp_metrics.csv")
     subset_counts = pd.read_csv(metric_dir / "subset_counts.csv")
     seed_summary = pd.read_csv(metric_dir / "seed_repeat_summary.csv")
     rolling_summary = pd.read_csv(metric_dir / "rolling_origin_summary.csv")
@@ -69,9 +71,17 @@ def main() -> None:
         .loc[["Hybrid", "TFT", "StackedXGB", "DNN"], ["PhysicalViolationRate", "NegativeRate", "NightPositiveRateOnNight"]]
         .reset_index()
     )
+    bvp_focus = (
+        baseline_bvp.set_index("Model")
+        .loc[["Hybrid", "TFT", "StackedXGB", "DNN"], ["BVP", "BVPMean", "BVPMAE"]]
+        .reset_index()
+    )
     ablation_focus = ablation[
         ablation["Model"].isin(["Full Hybrid", "w/o Physics", "w/o Plant Adaptation", "w/o Scene Adaptation"])
     ][["Model", "MAE", "RMSE"]].copy()
+    ablation_bvp_focus = ablation_bvp[
+        ablation_bvp["Model"].isin(["Full Hybrid", "w/o Physics", "w/o Plant Adaptation", "w/o Scene Adaptation"])
+    ][["Model", "BVP", "BVPMean", "BVPMAE"]].copy()
 
     hybrid_mae = get_metric(baseline, "Hybrid", "MAE")
     tft_mae = get_metric(baseline, "TFT", "MAE")
@@ -84,6 +94,11 @@ def main() -> None:
     hybrid_phys = get_metric(physical, "Hybrid", "PhysicalViolationRate")
     tft_phys = get_metric(physical, "TFT", "PhysicalViolationRate")
     stacked_phys = get_metric(physical, "StackedXGB", "PhysicalViolationRate")
+    hybrid_bvp = get_metric(ablation_bvp, "Full Hybrid", "BVP")
+    hybrid_bvp_mae = get_metric(ablation_bvp, "Full Hybrid", "BVPMAE")
+    wophys_bvp = get_metric(ablation_bvp, "w/o Physics", "BVP")
+    wophys_bvp_mae = get_metric(ablation_bvp, "w/o Physics", "BVPMAE")
+    hybrid_bvp_reduction = ((wophys_bvp - hybrid_bvp) / wophys_bvp * 100.0) if wophys_bvp > 0 else 0.0
 
     hybrid_seed_mae = get_metric(seed_summary, "Hybrid", "MAE_mean")
     tft_seed_mae = get_metric(seed_summary, "TFT", "MAE_mean")
@@ -134,13 +149,21 @@ def main() -> None:
 ## 3. Physical Violation
 {md_table(physical_focus)}
 
-## 4. Hybrid 消融
+## 4. BVP 指标
+{md_table(bvp_focus)}
+
+## 5. Hybrid 消融
 {md_table(ablation_focus)}
 
-## 5. 结论
+## 6. Hybrid BVP 消融
+{md_table(ablation_bvp_focus)}
+
+## 7. 结论
 - 固定切分下，`Hybrid` 的 MAE 为 `{hybrid_mae:.6f}`，优于 `TFT` 的 `{tft_mae:.6f}` 和 `StackedXGB` 的 `{stacked_mae:.6f}`。
 - `daytime-only` 下，`Hybrid` 的 MAE 为 `{hybrid_day_mae:.6f}`，同样优于 `TFT` 的 `{tft_day_mae:.6f}` 与 `StackedXGB` 的 `{stacked_day_mae:.6f}`。
 - physical violation rate 显示：`Hybrid` 不是约束一致性最优，但仍维持低违例水平，并显著好于 `DNN`。
+- 在 `forecast_solar_elevation_deg <= 0` 或 `forecast_global_radiation <= {config.night_radiation_threshold:.1f}` 的不可行域上，`Hybrid` 的 `BVP={hybrid_bvp:.6f}`，低于 `w/o Physics` 的 `{wophys_bvp:.6f}`，下降 `{hybrid_bvp_reduction:.2f}%`。
+- 对应不可行域上的 MAE 也从 `{wophys_bvp_mae:.6f}` 降到 `{hybrid_bvp_mae:.6f}`，说明 Physics Adjustment 的收益主要体现在夜间/极低辐照样本。
 - 当前最稳的主叙事是：`Hybrid` 提供了最强的综合预测表现，`TFT` 是更充分训练后的深度时序强基线，`StackedXGB` 是重要但不占主叙事中心的元学习对照。
 """.strip()
 
@@ -173,7 +196,7 @@ def main() -> None:
 
 ## 2. 可以主打的贡献组织
 - 方法贡献：`scene-aware interpretable fusion`。
-- 评估贡献：`constraint-aware evaluation`，即在误差之外显式统计 physical violation。
+- 评估贡献：`constraint-aware evaluation`，即在误差之外显式统计 physical violation 和 `BVP`。
 - 系统贡献：统一数据处理、图表生成、训练配置记录和项目校验的可复现实验流水线。
 
 ## 3. 当前最能讲的证据
@@ -182,6 +205,7 @@ def main() -> None:
 - 多随机种子：`Hybrid` 平均 MAE 低于 `TFT` 和 `StackedXGB`。
 - rolling-origin：`Hybrid` 平均 MAE 最低。
 - constraint-aware evaluation：`Hybrid` 的 physical violation rate 为 `{hybrid_phys:.6f}`，明显低于 `DNN`，但高于 `TFT` 的 `{tft_phys:.6f}` 与 `StackedXGB` 的 `{stacked_phys:.6f}`。
+- Physics Adjustment 证据：`Hybrid` 在不可行域上的 `BVP={hybrid_bvp:.6f}`，相较 `w/o Physics` 的 `{wophys_bvp:.6f}` 下降 `{hybrid_bvp_reduction:.2f}%`。
 
 ## 4. 推荐表述
 - 用 `scene-aware interpretable fusion`、`heterogeneous temporal data mining`、`constraint-aware evaluation`。
@@ -192,7 +216,7 @@ def main() -> None:
     paper_draft = f"""# Scene-Aware Interpretable Fusion with Constraint-Aware Evaluation for Heterogeneous PV Time-Series Mining
 
 ## 摘要
-本文将异构光伏装置上的 `5-minute-ahead` 功率预测问题表述为一个带已知未来外生变量的异构时间序列数据挖掘任务。围绕这一设定，本文构建了一套可复现实验流水线，并提出一种按电站与辐照场景切换权重的可解释融合方法 `Hybrid`。该方法在 `XGBoost`、`DNN` 和 `TFT` 三类异构基学习器之上进行结构化融合，并保留轻量物理后修正以抑制不合理输出。实验基于 Alice Springs 站点四个异构光伏装置，采用时间顺序切分、`6` 小时间隔保护、`daytime-only`、多随机种子和 rolling-origin 评估。结果表明，固定切分下 `Hybrid` 将 `TFT` 的 MAE 从 `{tft_mae:.6f}` 降至 `{hybrid_mae:.6f}`；在白天子集上，`Hybrid` 的 MAE 为 `{hybrid_day_mae:.6f}`，优于 `TFT` 的 `{tft_day_mae:.6f}`。在多随机种子和 rolling-origin 下，`Hybrid` 仍保持最低平均 MAE。进一步引入 physical violation rate 后，结果显示 `Hybrid` 在精度、稳定性与物理一致性之间取得了更平衡的表现。
+本文将异构光伏装置上的 `5-minute-ahead` 功率预测问题表述为一个带已知未来外生变量的异构时间序列数据挖掘任务。围绕这一设定，本文构建了一套可复现实验流水线，并提出一种按电站与辐照场景切换权重的可解释融合方法 `Hybrid`。该方法在 `XGBoost`、`DNN` 和 `TFT` 三类异构基学习器之上进行结构化融合，并保留轻量物理后修正以抑制不合理输出。实验基于 Alice Springs 站点四个异构光伏装置，采用时间顺序切分、`6` 小时间隔保护、`daytime-only`、多随机种子和 rolling-origin 评估。结果表明，固定切分下 `Hybrid` 将 `TFT` 的 MAE 从 `{tft_mae:.6f}` 降至 `{hybrid_mae:.6f}`；在白天子集上，`Hybrid` 的 MAE 为 `{hybrid_day_mae:.6f}`，优于 `TFT` 的 `{tft_day_mae:.6f}`。在多随机种子和 rolling-origin 下，`Hybrid` 仍保持最低平均 MAE。进一步引入 physical violation rate 与 `BVP` 后，结果显示 `Hybrid` 在精度、稳定性与物理一致性之间取得了更平衡的表现。
 
 ## 关键词
 光伏预测；异构时间序列；可解释融合；场景自适应；constraint-aware evaluation
@@ -217,7 +241,7 @@ def main() -> None:
 `Hybrid` 的核心机制是按场景和电站分解权重。对于每一个样本，先根据辐照水平归入场景，再调用该电站在该场景下的融合权重，对三个基学习器的输出做加权。这样得到的结果具有直接可解释性：权重本身就是“在该电站、该场景下更相信谁”的显式表达。
 
 ### 3.3 Constraint-Aware Evaluation
-为了避免只用误差指标评估，本文引入 physical violation rate。当前版本使用两类最硬的违例：
+为了避免只用误差指标评估，本文引入 physical violation rate 与 `BVP`。当前版本使用两类最硬的违例：
 - 负功率违例：预测值小于 `-epsilon_p`；
 - 夜间正功率违例：夜间样本的预测值大于 `epsilon_p`。
 
@@ -227,7 +251,14 @@ def main() -> None:
 PVR = (1 / N) * sum I[y_hat_t < -epsilon_p or (night_t = 1 and y_hat_t > epsilon_p)]
 ```
 
-这个指标不把 `Hybrid` 强行包装成约束优化模型，但确实给出了更接近 `SDM` 口径的 constraint-aware evaluation。
+同时，定义夜间/极低辐射集合
+
+```text
+Omega_bvp = {{t | elevation_t <= 0 or G_t <= R_th}}
+BVP = sum_{{t in Omega_bvp}} max(y_hat_t, 0)
+```
+
+其中 `R_th={config.night_radiation_threshold:.1f}`。`BVP` 直接度量模型在物理上本该接近 `0` 的时段里错误输出了多少正向能量，更适合用于论证 Physics Adjustment 的贡献。
 
 ## 4. 实验设计
 ### 4.1 数据与任务
@@ -262,10 +293,14 @@ PVR = (1 / N) * sum I[y_hat_t < -epsilon_p or (night_t = 1 and y_hat_t > epsilon
 ### 5.3 Constraint-Aware Evaluation
 {md_table(physical_focus)}
 
-这一结果提供了与 `SDM` 更契合的补充证据：模型不仅要低误差，还要尽量少地产生负功率或夜间异常正功率。`Hybrid` 的违例率保持较低，显著好于 `DNN`，但仍高于 `TFT` 与 `StackedXGB`。因此更稳的结论不是“`Hybrid` 在所有约束一致性指标上最优”，而是“`Hybrid` 在预测精度与约束一致性之间取得更优平衡”。
+{md_table(bvp_focus)}
+
+这一结果提供了与 `SDM` 更契合的补充证据：模型不仅要低误差，还要尽量少地产生负功率、夜间异常正功率以及不可行域上的正向能量泄漏。`Hybrid` 的违例率保持较低，显著好于 `DNN`，但仍高于 `TFT` 与 `StackedXGB`。另一方面，`Hybrid` 在 `BVP` 上为 `{hybrid_bvp:.6f}`，明显低于 `w/o Physics` 的 `{wophys_bvp:.6f}`，说明 Physics Adjustment 的主要收益确实体现在夜间/极低辐照样本。更稳的结论不是“`Hybrid` 在所有约束一致性指标上最优”，而是“`Hybrid` 在预测精度与约束一致性之间取得更优平衡”。
 
 ### 5.4 消融与鲁棒性
 {md_table(ablation_focus)}
+
+{md_table(ablation_bvp_focus)}
 
 {md_table(seed_display)}
 
@@ -283,10 +318,10 @@ PVR = (1 / N) * sum I[y_hat_t < -epsilon_p or (night_t = 1 and y_hat_t > epsilon
 ## 7. 局限性
 - 数据范围仍局限于同一站点的四个异构装置，跨站点外推能力尚未验证。
 - 当前任务是单步预测，尚未扩展到多步预测或更长时间尺度。
-- constraint-aware 指标目前聚焦于负功率和夜间异常正功率，尚未进一步扩展到更强的清空包络或 ramp-rate 约束。
+- constraint-aware 指标目前聚焦于负功率、夜间异常正功率和不可行域正向能量泄漏，尚未进一步扩展到更强的清空包络或 ramp-rate 约束。
 
 ## 8. 结论
-当前这套实验最适合形成如下论文主线：在异构光伏时间序列上，单一强基线难以覆盖所有场景，而场景自适应、结构化、可解释的融合能够在精度、稳定性和物理合理性之间取得更优平衡。就现有结果而言，`Hybrid` 是主方法，`TFT` 是更强后的深度时序基线，physical violation 则为全文补上了更符合 `SDM` 口味的 constraint-aware 评价维度。
+当前这套实验最适合形成如下论文主线：在异构光伏时间序列上，单一强基线难以覆盖所有场景，而场景自适应、结构化、可解释的融合能够在精度、稳定性和物理合理性之间取得更优平衡。就现有结果而言，`Hybrid` 是主方法，`TFT` 是更强后的深度时序基线，physical violation 与 `BVP` 则为全文补上了更符合 `SDM` 口味的 constraint-aware 评价维度。
 """.strip()
 
     outputs = {

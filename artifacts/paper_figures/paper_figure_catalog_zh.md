@@ -36,6 +36,9 @@
 ## rolling_origin_overview.png
 - Rolling-origin MAE and RMSE across evaluation windows.
 
+## bvp_overview.png
+- Positive energy leakage, infeasible-region MAE, and Physics Adjustment gain.
+
 ## method_framework.png
 - Method diagram for the forecasting pipeline and Hybrid fusion.
 

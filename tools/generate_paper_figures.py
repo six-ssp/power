@@ -471,6 +471,102 @@ def plot_rolling_origin_overview(rolling_metrics: pd.DataFrame, output: Path) ->
     plt.close(figure)
 
 
+def plot_bvp_overview(baseline_bvp: pd.DataFrame, ablation_bvp: pd.DataFrame, output: Path) -> None:
+    focus_models = ["DNN", "TFT", "Hybrid", "StackedXGB"]
+    baseline_focus = baseline_bvp[baseline_bvp["Model"].isin(focus_models)].copy()
+    baseline_focus = order_models(baseline_focus)
+    labels = [DISPLAY_LABELS[name] for name in baseline_focus["Model"]]
+
+    full_hybrid_bvp = float(ablation_bvp.loc[ablation_bvp["Model"] == "Full Hybrid", "BVP"].iloc[0])
+    wophys_bvp = float(ablation_bvp.loc[ablation_bvp["Model"] == "w/o Physics", "BVP"].iloc[0])
+    full_hybrid_bvp_mae = float(ablation_bvp.loc[ablation_bvp["Model"] == "Full Hybrid", "BVPMAE"].iloc[0])
+    wophys_bvp_mae = float(ablation_bvp.loc[ablation_bvp["Model"] == "w/o Physics", "BVPMAE"].iloc[0])
+    reductions = pd.DataFrame(
+        {
+            "Metric": ["BVP", "BVPMAE"],
+            "ReductionPct": [
+                (wophys_bvp - full_hybrid_bvp) / wophys_bvp * 100.0,
+                (wophys_bvp_mae - full_hybrid_bvp_mae) / wophys_bvp_mae * 100.0,
+            ],
+        }
+    )
+
+    figure, axes = plt.subplots(1, 3, figsize=(16.2, 4.9))
+
+    bars_bvp = axes[0].bar(
+        labels,
+        baseline_focus["BVP"],
+        color=model_colors(baseline_focus["Model"]),
+        edgecolor=model_edges(baseline_focus["Model"]),
+        linewidth=1.2,
+        width=0.76,
+    )
+    style_axis(axes[0], "Positive Energy Leakage (BVP)", ylabel="BVP", grid_axis="y")
+    axes[0].tick_params(axis="x", labelsize=11)
+    axes[0].set_ylim(0, float(baseline_focus["BVP"].max()) * 1.16)
+    add_bar_labels(axes[0], bars_bvp, "{:.1f}")
+
+    bars_bvp_mae = axes[1].bar(
+        labels,
+        baseline_focus["BVPMAE"],
+        color=model_colors(baseline_focus["Model"]),
+        edgecolor=model_edges(baseline_focus["Model"]),
+        linewidth=1.2,
+        width=0.76,
+    )
+    style_axis(axes[1], "Infeasible-Region MAE", ylabel="MAE", grid_axis="y")
+    axes[1].tick_params(axis="x", labelsize=11)
+    axes[1].set_ylim(0, float(baseline_focus["BVPMAE"].max()) * 1.18)
+    add_bar_labels(axes[1], bars_bvp_mae, "{:.3f}")
+
+    gain_bars = axes[2].barh(
+        reductions["Metric"],
+        reductions["ReductionPct"],
+        color=[COLORS["Hybrid"], "#FFD92F"],
+        edgecolor=["#8a3d00", EDGE],
+        linewidth=1.2,
+        height=0.54,
+    )
+    style_axis(axes[2], "Physics Adjustment Gain", xlabel="Reduction vs w/o Physics (%)", grid_axis="x")
+    axes[2].set_xlim(0, float(reductions["ReductionPct"].max()) * 1.28)
+    axes[2].invert_yaxis()
+    for bar, metric in zip(gain_bars, reductions["Metric"]):
+        value = float(bar.get_width())
+        axes[2].text(
+            value + axes[2].get_xlim()[1] * 0.02,
+            bar.get_y() + bar.get_height() / 2,
+            f"{value:.1f}%",
+            va="center",
+            ha="left",
+            fontsize=10,
+            color=MUTED,
+        )
+        if metric == "BVP":
+            axes[2].text(
+                axes[2].get_xlim()[1] * 0.04,
+                bar.get_y() + bar.get_height() / 2,
+                f"{full_hybrid_bvp:.1f} vs {wophys_bvp:.1f}",
+                va="center",
+                ha="left",
+                fontsize=9,
+                color=TEXT,
+            )
+        else:
+            axes[2].text(
+                axes[2].get_xlim()[1] * 0.04,
+                bar.get_y() + bar.get_height() / 2,
+                f"{full_hybrid_bvp_mae:.4f} vs {wophys_bvp_mae:.4f}",
+                va="center",
+                ha="left",
+                fontsize=9,
+                color=TEXT,
+            )
+
+    figure.tight_layout(w_pad=2.2)
+    figure.savefig(output, dpi=260, bbox_inches="tight")
+    plt.close(figure)
+
+
 def plot_method_framework(output: Path) -> None:
     figure, axis = plt.subplots(figsize=(12.5, 6.2))
     figure.patch.set_facecolor(BACKGROUND)
@@ -567,6 +663,9 @@ def write_catalog_clean(output: Path) -> None:
             "## rolling_origin_overview.png",
             "- Rolling-origin MAE and RMSE across evaluation windows.",
             "",
+            "## bvp_overview.png",
+            "- Positive energy leakage, infeasible-region MAE, and Physics Adjustment gain.",
+            "",
             "## method_framework.png",
             "- Method diagram for the forecasting pipeline and Hybrid fusion.",
             "",
@@ -588,6 +687,8 @@ def main() -> None:
     baseline = pd.read_csv(metrics_dir / "baseline_metrics.csv")
     baseline_daytime = pd.read_csv(metrics_dir / "baseline_daytime_metrics.csv")
     ablation = pd.read_csv(metrics_dir / "ablation_metrics.csv")
+    baseline_bvp = pd.read_csv(metrics_dir / "baseline_bvp_metrics.csv")
+    ablation_bvp = pd.read_csv(metrics_dir / "ablation_bvp_metrics.csv")
     plant_table = pd.read_csv(metrics_dir / "plant_level_metrics.csv")
     seed_summary = pd.read_csv(metrics_dir / "seed_repeat_summary.csv")
     rolling_metrics = pd.read_csv(metrics_dir / "rolling_origin_metrics.csv")
@@ -605,6 +706,7 @@ def main() -> None:
     plot_gain_by_plant(plant_table, paper_dir / "plant_gain_over_tft.png")
     plot_seed_stability(seed_summary, paper_dir / "seed_stability.png")
     plot_rolling_origin_overview(rolling_metrics, paper_dir / "rolling_origin_overview.png")
+    plot_bvp_overview(baseline_bvp, ablation_bvp, paper_dir / "bvp_overview.png")
     plot_method_framework(paper_dir / "method_framework.png")
     write_catalog_clean(paper_dir / "paper_figure_catalog_zh.md")
     print("saved", paper_dir)

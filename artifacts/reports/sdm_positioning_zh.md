@@ -7,7 +7,7 @@
 
 ## 2. 可以主打的贡献组织
 - 方法贡献：`scene-aware interpretable fusion`。
-- 评估贡献：`constraint-aware evaluation`，即在误差之外显式统计 physical violation。
+- 评估贡献：`constraint-aware evaluation`，即在误差之外显式统计 physical violation 和 `BVP`。
 - 系统贡献：统一数据处理、图表生成、训练配置记录和项目校验的可复现实验流水线。
 
 ## 3. 当前最能讲的证据
@@ -16,6 +16,7 @@
 - 多随机种子：`Hybrid` 平均 MAE 低于 `TFT` 和 `StackedXGB`。
 - rolling-origin：`Hybrid` 平均 MAE 最低。
 - constraint-aware evaluation：`Hybrid` 的 physical violation rate 为 `0.000508`，明显低于 `DNN`，但高于 `TFT` 的 `0.000008` 与 `StackedXGB` 的 `0.000016`。
+- Physics Adjustment 证据：`Hybrid` 在不可行域上的 `BVP=82.801440`，相较 `w/o Physics` 的 `110.053723` 下降 `24.76%`。
 
 ## 4. 推荐表述
 - 用 `scene-aware interpretable fusion`、`heterogeneous temporal data mining`、`constraint-aware evaluation`。

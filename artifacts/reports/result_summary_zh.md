@@ -30,7 +30,15 @@
 | StackedXGB | 0.000016 | 0.000000 | 0.000031 |
 | DNN | 0.099240 | 0.099192 | 0.000093 |
 
-## 4. Hybrid 消融
+## 4. BVP 指标
+| Model | BVP | BVPMean | BVPMAE |
+| --- | --- | --- | --- |
+| Hybrid | 82.801440 | 0.001228 | 0.002170 |
+| TFT | 138.271500 | 0.002051 | 0.002817 |
+| StackedXGB | 537.819166 | 0.007976 | 0.007798 |
+| DNN | 40.385780 | 0.000599 | 0.019131 |
+
+## 5. Hybrid 消融
 | Model | MAE | RMSE |
 | --- | --- | --- |
 | Full Hybrid | 0.021530 | 0.064468 |
@@ -38,8 +46,18 @@
 | w/o Plant Adaptation | 0.021745 | 0.064162 |
 | w/o Scene Adaptation | 0.023153 | 0.066229 |
 
-## 5. 结论
+## 6. Hybrid BVP 消融
+| Model | BVP | BVPMean | BVPMAE |
+| --- | --- | --- | --- |
+| Full Hybrid | 82.801440 | 0.001228 | 0.002170 |
+| w/o Physics | 110.053723 | 0.001632 | 0.002575 |
+| w/o Plant Adaptation | 80.853938 | 0.001199 | 0.002136 |
+| w/o Scene Adaptation | 62.286833 | 0.000924 | 0.003651 |
+
+## 7. 结论
 - 固定切分下，`Hybrid` 的 MAE 为 `0.021530`，优于 `TFT` 的 `0.026838` 和 `StackedXGB` 的 `0.029018`。
 - `daytime-only` 下，`Hybrid` 的 MAE 为 `0.043451`，同样优于 `TFT` 的 `0.053429` 与 `StackedXGB` 的 `0.052496`。
 - physical violation rate 显示：`Hybrid` 不是约束一致性最优，但仍维持低违例水平，并显著好于 `DNN`。
+- 在 `forecast_solar_elevation_deg <= 0` 或 `forecast_global_radiation <= 20.0` 的不可行域上，`Hybrid` 的 `BVP=82.801440`，低于 `w/o Physics` 的 `110.053723`，下降 `24.76%`。
+- 对应不可行域上的 MAE 也从 `0.002575` 降到 `0.002170`，说明 Physics Adjustment 的收益主要体现在夜间/极低辐照样本。
 - 当前最稳的主叙事是：`Hybrid` 提供了最强的综合预测表现，`TFT` 是更充分训练后的深度时序强基线，`StackedXGB` 是重要但不占主叙事中心的元学习对照。

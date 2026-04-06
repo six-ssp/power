@@ -14,12 +14,14 @@ from pvbench import ExperimentConfig, load_and_prepare_data
 from pvbench.data import build_windowed_prepared_data
 from pvbench.reporting import build_physical_violation_margin_map
 from run_experiments import (
+    ABLATION_SPECS,
     BASELINE_SPECS,
     build_subset_count_table,
     build_training_configuration_table,
     build_training_execution_table,
     build_window_description,
     clone_runtime_config,
+    collect_bvp_metric_table,
     collect_metric_table,
     collect_physical_metric_table,
     collect_plant_metric_table,
@@ -67,6 +69,16 @@ def run_main_stage(config: ExperimentConfig) -> None:
         BASELINE_SPECS,
         margin_map=physical_margin_map,
     )
+    baseline_bvp_table = collect_bvp_metric_table(
+        artifacts.test_predictions,
+        BASELINE_SPECS,
+        radiation_threshold=config.night_radiation_threshold,
+    )
+    ablation_bvp_table = collect_bvp_metric_table(
+        artifacts.test_predictions,
+        ABLATION_SPECS,
+        radiation_threshold=config.night_radiation_threshold,
+    )
     subset_count_table = build_subset_count_table(artifacts.test_predictions)
 
     save_primary_outputs(
@@ -77,6 +89,8 @@ def run_main_stage(config: ExperimentConfig) -> None:
         subset_count_table=subset_count_table,
         baseline_physical_table=baseline_physical_table,
         plant_physical_table=plant_physical_table,
+        baseline_bvp_table=baseline_bvp_table,
+        ablation_bvp_table=ablation_bvp_table,
     )
     save_metrics_table(training_config_table.to_dict("records"), config.metric_dir / "training_configuration.csv")
     save_metrics_table(training_execution_table.to_dict("records"), config.metric_dir / "training_execution_summary.csv")

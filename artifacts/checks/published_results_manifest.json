@@ -1,6 +1,6 @@
 {
   "format_version": 1,
-  "created_at_utc": "2026-04-02T13:35:59.015960+00:00",
+  "created_at_utc": "2026-04-06T08:44:53.925692+00:00",
   "files": [
     {
       "path": "artifacts/metrics/baseline_metrics.csv",
@@ -33,6 +33,12 @@
       "sha256": "0d9653d72c63f9511e176255702b90775ab6fcdcb96e7ecce383ac717798ef4b"
     },
     {
+      "path": "artifacts/metrics/baseline_bvp_metrics.csv",
+      "exists": true,
+      "size": 959,
+      "sha256": "f4b6badaf2d2e5d9f6920cd4bc99f4a045e2dacd284538e4933a7f2d29898bc3"
+    },
+    {
       "path": "artifacts/metrics/plant_level_daytime_metrics.csv",
       "exists": true,
       "size": 5602,
@@ -43,6 +49,12 @@
       "exists": true,
       "size": 3263,
       "sha256": "3c3f995845eae5dcefc58633ac09b8401ba52f4132b55d9ce0415032d3bbd56b"
+    },
+    {
+      "path": "artifacts/metrics/ablation_bvp_metrics.csv",
+      "exists": true,
+      "size": 1283,
+      "sha256": "83f27b81a11a2e2d54a3b6b767ca02d2c70647210d8c429bc0ee0863a0671990"
     },
     {
       "path": "artifacts/metrics/subset_counts.csv",
@@ -101,8 +113,8 @@
     {
       "path": "artifacts/reports/result_summary_zh.md",
       "exists": true,
-      "size": 1988,
-      "sha256": "2ba6c60d5c8119c989320fb4f2097e9db25361bc4665fbae5312b8fd260fee3d"
+      "size": 2911,
+      "sha256": "b1eb8e403e2ca8608a696d4165e73c8f449e9d5ea198481e112e2be53e9354fa"
     },
     {
       "path": "artifacts/reports/robustness_summary_zh.md",
@@ -113,14 +125,14 @@
     {
       "path": "artifacts/reports/sdm_positioning_zh.md",
       "exists": true,
-      "size": 1557,
-      "sha256": "3adb83eabac4f2d6c1b969aa07ab589fed89641b04e1d0ce4647f74445728878"
+      "size": 1704,
+      "sha256": "8f930a6e710401b5a8685542de3a58374588cde8f93e7e968962b049188a9e15"
     },
     {
       "path": "artifacts/reports/paper_reference_draft_zh.md",
       "exists": true,
-      "size": 12139,
-      "sha256": "a588f2c37afa1dd51b6e80c3dc8a547cbe4febb489d4618173d7b25f97e813b1"
+      "size": 13152,
+      "sha256": "0cd30557861abb91bba10d76d42707b0ff6c97c1d5393f3290f6b5a39812b09e"
     }
   ]
 }

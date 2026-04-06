@@ -1,6 +1,6 @@
 # Scene-Aware PV Power Forecasting
 
-This repository is a research codebase for `5-minute-ahead` photovoltaic power forecasting on four heterogeneous PV assets at the Alice Springs site. The current project focus is not only forecasting accuracy, but also how to organize heterogeneous base learners, how to evaluate them under stricter temporal protocols, and how to add a lightweight constraint-aware view through physical violation checks.
+This repository is a research codebase for `5-minute-ahead` photovoltaic power forecasting on four heterogeneous PV assets at the Alice Springs site. The current project focus is not only forecasting accuracy, but also how to organize heterogeneous base learners, how to evaluate them under stricter temporal protocols, and how to add a lightweight constraint-aware view through physical violation checks and positive energy leakage in physically infeasible regions.
 
 `Hybrid` is the main method in this repository. It combines `XGBoost`, `DNN`, and `TFT` through scene-aware and plant-aware weighting, then applies a lightweight physics-guided post-adjustment on low-irradiance and nighttime samples.
 
@@ -15,7 +15,7 @@ This repository is a research codebase for `5-minute-ahead` photovoltaic power f
 
 - Research question: how to perform structured and interpretable model fusion on heterogeneous PV time series with known next-step weather.
 - Main method: `Hybrid`, a scene-aware interpretable fusion model over `XGBoost`, `DNN`, and `TFT`.
-- Evaluation emphasis: chronological split, split gap, `daytime-only`, multi-seed, `rolling-origin`, and physical violation rate.
+- Evaluation emphasis: chronological split, split gap, `daytime-only`, multi-seed, `rolling-origin`, physical violation rate, and `BVP`.
 - Current role of baselines: `TFT` is the stronger deep temporal baseline after the higher training budget; `StackedXGB` is a meta-learning comparison rather than the main story.
 
 ## Problem Setup
@@ -32,14 +32,14 @@ This repository is a research codebase for `5-minute-ahead` photovoltaic power f
 | Supervised samples | `1,241,216` |
 | Continuous features | `96` |
 | Encoded features | `111` |
-| Main metrics | `MAE`, `RMSE`, `R2`, physical violation rates |
+| Main metrics | `MAE`, `RMSE`, `R2`, physical violation rates, `BVP` |
 
 ## Why This Repository Fits SDM
 
 - The data object is a heterogeneous multivariate time series rather than a single homogeneous forecast stream.
 - The method focus is structured model selection and fusion under changing regimes, not only pure black-box regression.
 - The evaluation protocol goes beyond one fixed split and adds `daytime-only`, multi-seed, and rolling-origin checks.
-- The repository reports physical violation rate, so the comparison is not limited to pointwise error.
+- The repository reports physical violation rate and `BVP`, so the comparison is not limited to pointwise error.
 
 ## Main Results
 
@@ -73,11 +73,27 @@ This repository is a research codebase for `5-minute-ahead` photovoltaic power f
 | StackedXGB | 0.000016 | 0.000000 | 0.000031 |
 | DNN | 0.099240 | 0.099192 | 0.000093 |
 
+### BVP on Physically Infeasible Region
+
+The repository defines the infeasible region as `forecast_solar_elevation_deg <= 0` or `forecast_global_radiation <= 20.0`, and reports
+
+```text
+BVP = sum max(y_hat_t, 0),  t in Omega_bvp
+```
+
+| Model | BVP | BVPMean | BVPMAE |
+| --- | ---: | ---: | ---: |
+| Hybrid | 82.801440 | 0.001228 | 0.002170 |
+| TFT | 138.271500 | 0.002051 | 0.002817 |
+| StackedXGB | 537.819166 | 0.007976 | 0.007798 |
+| DNN | 40.385780 | 0.000599 | 0.019131 |
+
 Current takeaway:
 
 - `Hybrid` is the strongest overall method under the current fixed split, daytime-only split, multi-seed summary, and rolling-origin summary.
 - `TFT` becomes materially stronger after the higher training budget, so the current comparison is more credible than the earlier exploratory version.
 - `Hybrid` is not the absolute best physical-consistency model, but it keeps violation rates low while delivering the best overall accuracy.
+- For the Physics Adjustment ablation, `Hybrid` reduces infeasible-region `BVP` from `110.053723` to `82.801440` against `w/o Physics`, a `24.76%` drop.
 
 ## Training Budget
 
@@ -139,7 +155,7 @@ Rebuild split parts from local raw CSV files:
 | Daytime-only | filter with `forecast_night_flag == 0`, ratio about `47.93%` |
 | Multi-seed | `42`, `52`, `62` |
 | Rolling-origin windows | `60/70/80`, `70/80/90`, `80/90/100` |
-| Stored metrics | `MAE`, `RMSE`, `MAPE`, `sMAPE`, `R2`, `Bias`, `Samples`, physical violation rates |
+| Stored metrics | `MAE`, `RMSE`, `MAPE`, `sMAPE`, `R2`, `Bias`, `Samples`, physical violation rates, `BVP` |
 
 `MAPE` is exported for completeness, but `MAE`, `RMSE`, and `R2` remain the primary metrics because nighttime power is often close to zero.
 
@@ -162,6 +178,12 @@ Rebuild split parts from local raw CSV files:
     <td align="center">Multi-seed stability</td>
     <td align="center">Rolling-origin evaluation</td>
   </tr>
+  <tr>
+    <td colspan="2"><img src="artifacts/paper_figures/bvp_overview.png" width="100%" alt="BVP overview"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">Positive energy leakage and Physics Adjustment effect</td>
+  </tr>
 </table>
 
 ## Repository Layout
@@ -174,7 +196,7 @@ Rebuild split parts from local raw CSV files:
 |   |-- config.py            # experiment configuration
 |   |-- data.py              # loading, normalization, feature engineering, splits
 |   |-- models.py            # baselines, Hybrid, AdaptiveBlend, StackedXGB
-|   `-- reporting.py         # metrics, plots, physical violation evaluation
+|   `-- reporting.py         # metrics, plots, physical violation and BVP evaluation
 |-- tools/
 |   |-- split_dataset_parts.py
 |   |-- merge_dataset_parts.py
@@ -244,7 +266,7 @@ This command restores the dataset from `dataset_parts/` if needed, clears stale 
 
 | Path | Description |
 | --- | --- |
-| `artifacts/metrics/` | fixed-split tables, daytime metrics, physical violation metrics, ablations, multi-seed summaries, rolling-origin summaries, training budget tables, predictions |
+| `artifacts/metrics/` | fixed-split tables, daytime metrics, physical violation metrics, BVP metrics, ablations, multi-seed summaries, rolling-origin summaries, training budget tables, predictions |
 | `artifacts/plots/` | general experiment plots |
 | `artifacts/paper_figures/` | paper-ready figures |
 | `artifacts/reports/` | Chinese training setup, result summary, robustness summary, SDM positioning notes, paper-style draft |

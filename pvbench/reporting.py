@@ -86,6 +86,57 @@ def compute_physical_violation_metrics(
     }
 
 
+def build_bvp_region_mask(frame: pd.DataFrame, radiation_threshold: float) -> np.ndarray:
+    required_columns = {"forecast_solar_elevation_deg", "forecast_global_radiation"}
+    missing_columns = required_columns.difference(frame.columns)
+    if missing_columns:
+        missing = ", ".join(sorted(missing_columns))
+        raise KeyError(f"Expected columns for BVP region mask are missing: {missing}.")
+
+    elevation = frame["forecast_solar_elevation_deg"].to_numpy(dtype=float)
+    global_radiation = frame["forecast_global_radiation"].to_numpy(dtype=float)
+    return (elevation <= 0.0) | (global_radiation <= float(radiation_threshold))
+
+
+def compute_bvp_metrics(
+    frame: pd.DataFrame,
+    prediction_column: str,
+    radiation_threshold: float,
+) -> dict[str, float]:
+    if "target_power" not in frame.columns:
+        raise KeyError("Expected 'target_power' in prediction frame to compute BVP metrics.")
+
+    region_mask = build_bvp_region_mask(frame, radiation_threshold)
+    region_samples = int(region_mask.sum())
+    if region_samples == 0:
+        return {
+            "BVP": 0.0,
+            "BVPMean": 0.0,
+            "BVPMAE": 0.0,
+            "PositiveLeakCount": 0,
+            "PositiveLeakRateOnRegion": 0.0,
+            "RegionSamples": 0,
+            "RegionRatio": 0.0,
+            "RadiationThreshold": float(radiation_threshold),
+        }
+
+    prediction = frame[prediction_column].to_numpy(dtype=float)[region_mask]
+    target = frame["target_power"].to_numpy(dtype=float)[region_mask]
+    positive_leakage = np.clip(prediction, 0.0, None)
+    positive_leak_mask = prediction > 0.0
+
+    return {
+        "BVP": float(np.sum(positive_leakage)),
+        "BVPMean": float(np.mean(positive_leakage)),
+        "BVPMAE": float(np.mean(np.abs(prediction - target))),
+        "PositiveLeakCount": int(positive_leak_mask.sum()),
+        "PositiveLeakRateOnRegion": float(np.mean(positive_leak_mask)),
+        "RegionSamples": region_samples,
+        "RegionRatio": float(np.mean(region_mask)),
+        "RadiationThreshold": float(radiation_threshold),
+    }
+
+
 def filter_daytime_frame(frame: pd.DataFrame) -> pd.DataFrame:
     if "forecast_night_flag" not in frame.columns:
         raise KeyError("Expected 'forecast_night_flag' in prediction frame to build daytime-only metrics.")

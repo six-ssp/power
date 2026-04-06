@@ -26,6 +26,7 @@ from pvbench.models import (
 )
 from pvbench.reporting import (
     build_physical_violation_margin_map,
+    compute_bvp_metrics,
     compute_metrics,
     compute_physical_violation_metrics,
     filter_daytime_frame,
@@ -244,6 +245,18 @@ def collect_plant_physical_metric_table(
         for model_name, column in specs.items():
             metrics = compute_physical_violation_metrics(plant_frame, column, margin_map)
             rows.append({"Plant": plant_id, "Model": model_name, **metrics})
+    return pd.DataFrame(rows)
+
+
+def collect_bvp_metric_table(
+    frame: pd.DataFrame,
+    specs: dict[str, str],
+    radiation_threshold: float,
+) -> pd.DataFrame:
+    rows = []
+    for model_name, column in specs.items():
+        metrics = compute_bvp_metrics(frame, column, radiation_threshold)
+        rows.append({"Model": model_name, **metrics})
     return pd.DataFrame(rows)
 
 
@@ -1259,6 +1272,8 @@ def save_primary_outputs(
     subset_count_table: pd.DataFrame,
     baseline_physical_table: pd.DataFrame,
     plant_physical_table: pd.DataFrame,
+    baseline_bvp_table: pd.DataFrame,
+    ablation_bvp_table: pd.DataFrame,
 ) -> None:
     save_metrics_table(main_artifacts.baseline_table.to_dict("records"), config.metric_dir / "baseline_metrics.csv")
     save_metrics_table(main_artifacts.ablation_table.to_dict("records"), config.metric_dir / "ablation_metrics.csv")
@@ -1267,6 +1282,8 @@ def save_primary_outputs(
     save_metrics_table(plant_daytime_table.to_dict("records"), config.metric_dir / "plant_level_daytime_metrics.csv")
     save_metrics_table(baseline_physical_table.to_dict("records"), config.metric_dir / "baseline_physical_metrics.csv")
     save_metrics_table(plant_physical_table.to_dict("records"), config.metric_dir / "plant_level_physical_metrics.csv")
+    save_metrics_table(baseline_bvp_table.to_dict("records"), config.metric_dir / "baseline_bvp_metrics.csv")
+    save_metrics_table(ablation_bvp_table.to_dict("records"), config.metric_dir / "ablation_bvp_metrics.csv")
     save_metrics_table(subset_count_table.to_dict("records"), config.metric_dir / "subset_counts.csv")
     save_metrics_table(main_artifacts.blend_summary.to_dict("records"), config.metric_dir / "blend_summary.csv")
     main_artifacts.val_predictions.to_csv(config.metric_dir / "validation_predictions.csv", index=False, encoding="utf-8-sig")
@@ -1314,6 +1331,16 @@ def main() -> None:
         BASELINE_SPECS,
         margin_map=physical_margin_map,
     )
+    baseline_bvp_table = collect_bvp_metric_table(
+        main_artifacts.test_predictions,
+        BASELINE_SPECS,
+        radiation_threshold=config.night_radiation_threshold,
+    )
+    ablation_bvp_table = collect_bvp_metric_table(
+        main_artifacts.test_predictions,
+        ABLATION_SPECS,
+        radiation_threshold=config.night_radiation_threshold,
+    )
     subset_count_table = build_subset_count_table(main_artifacts.test_predictions)
 
     save_primary_outputs(
@@ -1324,6 +1351,8 @@ def main() -> None:
         subset_count_table=subset_count_table,
         baseline_physical_table=baseline_physical_table,
         plant_physical_table=plant_physical_table,
+        baseline_bvp_table=baseline_bvp_table,
+        ablation_bvp_table=ablation_bvp_table,
     )
 
     seed_repeat_table, seed_repeat_summary = run_seed_repeats(config, main_artifacts.prepared_data)
@@ -1401,6 +1430,9 @@ def main() -> None:
             rolling_summary=rolling_origin_summary,
         ),
     )
+    from tools.write_reports import main as refresh_reports_main
+
+    refresh_reports_main()
 
     print("Baseline metrics saved to:", config.metric_dir / "baseline_metrics.csv", flush=True)
     print("Ablation metrics saved to:", config.metric_dir / "ablation_metrics.csv", flush=True)
