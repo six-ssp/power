@@ -16,6 +16,7 @@ This repository is a research codebase for `5-minute-ahead` photovoltaic power f
 - Research question: how to perform structured and interpretable model fusion on heterogeneous PV time series with known next-step weather.
 - Main method: `Hybrid`, a scene-aware interpretable fusion model over `XGBoost`, `DNN`, and `TFT`.
 - Evaluation emphasis: chronological split, split gap, `daytime-only`, multi-seed, `rolling-origin`, physical violation rate, and `BVP`.
+- Fixed-split comparison set: `9` baseline models and `11` ablation or fusion variants.
 - Current role of baselines: `TFT` is the stronger deep temporal baseline after the higher training budget; `StackedXGB` is a meta-learning comparison rather than the main story.
 
 ## Problem Setup
@@ -51,6 +52,8 @@ This repository is a research codebase for `5-minute-ahead` photovoltaic power f
 | XGBoost | 0.042605 | 0.087974 | 0.995140 |
 | DNN | 0.033542 | 0.068490 | 0.997054 |
 | TFT | 0.026838 | 0.070332 | 0.996894 |
+| MeanAverage | 0.022700 | 0.066302 | 0.997240 |
+| StaticBlend | 0.023153 | 0.066229 | 0.997246 |
 | Hybrid | 0.021530 | 0.064468 | 0.997390 |
 | AdaptiveBlend | 0.024887 | 0.075229 | 0.996446 |
 | StackedXGB | 0.029018 | 0.067131 | 0.997170 |
@@ -68,6 +71,8 @@ This repository is a research codebase for `5-minute-ahead` photovoltaic power f
 
 | Model | PhysicalViolationRate | NegativeRate | NightPositiveRateOnNight |
 | --- | ---: | ---: | ---: |
+| MeanAverage | 0.000403 | 0.000371 | 0.000062 |
+| StaticBlend | 0.000815 | 0.000783 | 0.000062 |
 | Hybrid | 0.000508 | 0.000492 | 0.000031 |
 | TFT | 0.000008 | 0.000008 | 0.000000 |
 | StackedXGB | 0.000016 | 0.000000 | 0.000031 |
@@ -83,15 +88,21 @@ BVP = sum max(y_hat_t, 0),  t in Omega_bvp
 
 | Model | BVP | BVPMean | BVPMAE |
 | --- | ---: | ---: | ---: |
-| Hybrid | 82.801440 | 0.001228 | 0.002170 |
-| TFT | 138.271500 | 0.002051 | 0.002817 |
-| StackedXGB | 537.819166 | 0.007976 | 0.007798 |
+| Persistence | 30.888064 | 0.000458 | 0.000323 |
+| XGBoost | 1369.826438 | 0.020315 | 0.020106 |
 | DNN | 40.385780 | 0.000599 | 0.019131 |
+| TFT | 138.271500 | 0.002051 | 0.002817 |
+| MeanAverage | 133.555242 | 0.001981 | 0.002648 |
+| StaticBlend | 62.286833 | 0.000924 | 0.003651 |
+| Hybrid | 82.801440 | 0.001228 | 0.002170 |
+| AdaptiveBlend | 43.576948 | 0.000646 | 0.004129 |
+| StackedXGB | 537.819166 | 0.007976 | 0.007798 |
 
 Current takeaway:
 
 - `Hybrid` is the strongest overall method under the current fixed split, daytime-only split, multi-seed summary, and rolling-origin summary.
 - `TFT` becomes materially stronger after the higher training budget, so the current comparison is more credible than the earlier exploratory version.
+- `MeanAverage` and `StaticBlend` are now restored as lightweight ensemble controls, making the fixed-split baseline table complete at `9` models.
 - `Hybrid` is not the absolute best physical-consistency model, but it keeps violation rates low while delivering the best overall accuracy.
 - For the Physics Adjustment ablation, `Hybrid` reduces infeasible-region `BVP` from `110.053723` to `82.801440` against `w/o Physics`, a `24.76%` drop.
 

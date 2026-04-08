@@ -66,22 +66,10 @@ def main() -> None:
 
     seed_display = format_mean_std(seed_summary)
     rolling_display = format_mean_std(rolling_summary)
-    physical_focus = (
-        physical.set_index("Model")
-        .loc[["Hybrid", "TFT", "StackedXGB", "DNN"], ["PhysicalViolationRate", "NegativeRate", "NightPositiveRateOnNight"]]
-        .reset_index()
-    )
-    bvp_focus = (
-        baseline_bvp.set_index("Model")
-        .loc[["Hybrid", "TFT", "StackedXGB", "DNN"], ["BVP", "BVPMean", "BVPMAE"]]
-        .reset_index()
-    )
-    ablation_focus = ablation[
-        ablation["Model"].isin(["Full Hybrid", "w/o Physics", "w/o Plant Adaptation", "w/o Scene Adaptation"])
-    ][["Model", "MAE", "RMSE"]].copy()
-    ablation_bvp_focus = ablation_bvp[
-        ablation_bvp["Model"].isin(["Full Hybrid", "w/o Physics", "w/o Plant Adaptation", "w/o Scene Adaptation"])
-    ][["Model", "BVP", "BVPMean", "BVPMAE"]].copy()
+    physical_focus = physical.copy()
+    bvp_focus = baseline_bvp.copy()
+    ablation_focus = ablation[["Model", "MAE", "RMSE"]].copy()
+    ablation_bvp_focus = ablation_bvp.copy()
 
     hybrid_mae = get_metric(baseline, "Hybrid", "MAE")
     tft_mae = get_metric(baseline, "TFT", "MAE")

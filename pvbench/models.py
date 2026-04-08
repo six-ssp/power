@@ -432,7 +432,7 @@ def fit_tft(prepared_data: PreparedData, config: ExperimentConfig) -> TFTResult:
         gradient_clip_val=config.tft_gradient_clip_val,
         callbacks=[early_stop, checkpoint_callback],
         num_sanity_val_steps=0,
-        deterministic=config.deterministic_training,
+        deterministic="warn" if config.deterministic_training else False,
         benchmark=False,
     )
     trainer.fit(model, train_dataloaders=train_loader, val_dataloaders=val_loader)

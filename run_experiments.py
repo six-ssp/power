@@ -44,6 +44,8 @@ BASELINE_SPECS = {
     "XGBoost": "xgboost_prediction",
     "DNN": "dnn_prediction",
     "TFT": "tft_prediction",
+    "MeanAverage": "mean_average_prediction",
+    "StaticBlend": "static_blend_prediction",
     "Hybrid": "hybrid_prediction",
     "AdaptiveBlend": "adaptive_blend_prediction",
     "StackedXGB": "stacked_xgboost_prediction",
@@ -53,6 +55,8 @@ BASELINE_SPECS = {
 ABLATION_SPECS = {
     "Full Hybrid": "hybrid_prediction",
     "w/o Physics": "hybrid_no_physics_prediction",
+    "Mean Average": "mean_average_prediction",
+    "Equal Weights": "equal_weight_prediction",
     "w/o Plant Adaptation": "hybrid_without_plant_adaptation",
     "w/o Scene Adaptation": "hybrid_without_scene_adaptation",
     "w/o XGBoost": "hybrid_without_xgboost",
@@ -81,6 +85,7 @@ class ExperimentArtifacts:
     hybrid_without_plant_result: MetaModelResult | None
     fixed_global_weights: dict[str, float]
     fixed_global_alpha: float
+    equal_weight_alpha: float
     component_hybrid_summaries: dict[str, dict[str, object]]
     adaptive_result: MetaModelResult
     stacked_result: MetaModelResult
@@ -548,6 +553,31 @@ def run_single_experiment(
     test_all = merge_predictions(test_base, tft_result.test_predictions, "test")
 
     hybrid_prediction_columns = ["xgboost_prediction", "dnn_prediction", "tft_prediction"]
+    mean_average_val = val_all[hybrid_prediction_columns].to_numpy(dtype=float).mean(axis=1)
+    mean_average_test = test_all[hybrid_prediction_columns].to_numpy(dtype=float).mean(axis=1)
+    val_all["mean_average_prediction"] = mean_average_val
+    test_all["mean_average_prediction"] = mean_average_test
+
+    fixed_global_weights, fixed_global_alpha, fixed_global_val, fixed_global_test = build_blend(
+        val_frame=val_all,
+        test_frame=test_all,
+        prediction_columns=hybrid_prediction_columns,
+        config=config,
+    )
+    fixed_global_weights = normalize_weight_dict(fixed_global_weights)
+    val_all["static_blend_prediction"] = fixed_global_val
+    test_all["static_blend_prediction"] = fixed_global_test
+
+    equal_weights = {column: 1.0 / len(hybrid_prediction_columns) for column in hybrid_prediction_columns}
+    equal_weight_alpha = 0.0
+    equal_weight_val = np.zeros(len(val_all), dtype=float)
+    equal_weight_test = np.zeros(len(test_all), dtype=float)
+    for column, weight in equal_weights.items():
+        equal_weight_val += val_all[column].to_numpy(dtype=float) * weight
+        equal_weight_test += test_all[column].to_numpy(dtype=float) * weight
+    equal_weight_alpha, equal_weight_val = tune_physics_alpha(val_all, equal_weight_val, config)
+    equal_weight_test = apply_physics_adjustment(test_all, equal_weight_test, equal_weight_alpha, config.night_radiation_threshold)
+
     log_progress("Fitting Hybrid.")
     hybrid_result = fit_scene_aware_hybrid(
         validation_frame=val_all,
@@ -564,8 +594,6 @@ def run_single_experiment(
     test_all["hybrid_prediction"] = hybrid_result.test_predictions
 
     hybrid_without_plant_result: MetaModelResult | None = None
-    fixed_global_weights: dict[str, float] = {}
-    fixed_global_alpha = 0.0
     component_hybrid_summaries: dict[str, dict[str, object]] = {}
     ablation_table = pd.DataFrame()
 
@@ -578,16 +606,11 @@ def run_single_experiment(
             config=config,
             plant_specific=False,
         )
-        fixed_global_weights, fixed_global_alpha, fixed_global_val, fixed_global_test = build_blend(
-            val_frame=val_all,
-            test_frame=test_all,
-            prediction_columns=hybrid_prediction_columns,
-            config=config,
-        )
-        fixed_global_weights = normalize_weight_dict(fixed_global_weights)
 
         val_all["hybrid_no_physics_prediction"] = hybrid_result.raw_val_predictions
         test_all["hybrid_no_physics_prediction"] = hybrid_result.raw_test_predictions
+        val_all["equal_weight_prediction"] = equal_weight_val
+        test_all["equal_weight_prediction"] = equal_weight_test
         val_all["hybrid_without_plant_adaptation"] = hybrid_without_plant_result.val_predictions
         test_all["hybrid_without_plant_adaptation"] = hybrid_without_plant_result.test_predictions
         val_all["hybrid_without_scene_adaptation"] = fixed_global_val
@@ -641,6 +664,9 @@ def run_single_experiment(
         {"name": "hybrid_thresholds", "value": str(hybrid_result.thresholds)},
         {"name": "hybrid_regime_weights", "value": str(hybrid_regime_weights)},
         {"name": "hybrid_physics_alpha", "value": f"{hybrid_result.physics_alpha:.6f}"},
+        {"name": "static_blend_weights", "value": str(fixed_global_weights)},
+        {"name": "static_blend_physics_alpha", "value": f"{fixed_global_alpha:.6f}"},
+        {"name": "equal_weight_physics_alpha", "value": f"{equal_weight_alpha:.6f}"},
         {"name": "adaptive_blend_avg_val_weights", "value": str(adaptive_result.avg_val_weights)},
         {"name": "adaptive_blend_avg_test_weights", "value": str(adaptive_result.avg_test_weights)},
         {"name": "adaptive_blend_physics_alpha", "value": f"{adaptive_result.physics_alpha:.6f}"},
@@ -675,6 +701,7 @@ def run_single_experiment(
         hybrid_without_plant_result=hybrid_without_plant_result,
         fixed_global_weights=fixed_global_weights,
         fixed_global_alpha=fixed_global_alpha,
+        equal_weight_alpha=equal_weight_alpha,
         component_hybrid_summaries=component_hybrid_summaries,
         adaptive_result=adaptive_result,
         stacked_result=stacked_result,

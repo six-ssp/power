@@ -11,3 +11,6 @@ hybrid_without_plant_regime_weights,"{'__global__': {'night': {'xgboost_predicti
 hybrid_without_plant_physics_alpha,0.600000
 hybrid_without_scene_weights,"{'xgboost_prediction': 0.35, 'dnn_prediction': 0.5, 'tft_prediction': 0.15000000000000002}"
 hybrid_without_scene_physics_alpha,0.600000
+static_blend_weights,"{'xgboost_prediction': np.float64(0.35), 'dnn_prediction': np.float64(0.5), 'tft_prediction': 0.15000000000000002}"
+static_blend_physics_alpha,0.600000
+equal_weight_physics_alpha,0.600000

@@ -30,6 +30,8 @@ COLORS = {
     "XGBoost": "#56B4E9",
     "DNN": "#66C2A5",
     "TFT": "#FC8D62",
+    "MeanAverage": "#E69F00",
+    "StaticBlend": "#F0E442",
     "Hybrid": "#D55E00",
     "AdaptiveBlend": "#A6D854",
     "StackedXGB": "#CC79A7",
@@ -40,6 +42,8 @@ DISPLAY_LABELS = {
     "XGBoost": "XGB",
     "DNN": "DNN",
     "TFT": "TFT",
+    "MeanAverage": "MeanAvg",
+    "StaticBlend": "Static",
     "Hybrid": "Hybrid",
     "AdaptiveBlend": "AdaBlend",
     "StackedXGB": "StackXGB",
@@ -50,6 +54,8 @@ HEATMAP_LABELS = {
     "XGBoost": "XGB",
     "DNN": "DNN",
     "TFT": "TFT",
+    "MeanAverage": "MeanAvg",
+    "StaticBlend": "Static",
     "Hybrid": "Hybrid",
     "AdaptiveBlend": "AdaBlend",
     "StackedXGB": "Stacked",
@@ -472,7 +478,7 @@ def plot_rolling_origin_overview(rolling_metrics: pd.DataFrame, output: Path) ->
 
 
 def plot_bvp_overview(baseline_bvp: pd.DataFrame, ablation_bvp: pd.DataFrame, output: Path) -> None:
-    focus_models = ["DNN", "TFT", "Hybrid", "StackedXGB"]
+    focus_models = ["DNN", "TFT", "MeanAverage", "StaticBlend", "Hybrid", "StackedXGB"]
     baseline_focus = baseline_bvp[baseline_bvp["Model"].isin(focus_models)].copy()
     baseline_focus = order_models(baseline_focus)
     labels = [DISPLAY_LABELS[name] for name in baseline_focus["Model"]]

@@ -120,6 +120,15 @@
     "unexpected": [],
     "mismatched": []
   },
+  "split_boundaries": {
+    "train_cutoff": 248473,
+    "val_start_idx": 248546,
+    "val_cutoff": 279532,
+    "test_start_idx": 279605,
+    "test_cutoff": 310592,
+    "split_gap_steps": 72,
+    "meta_train_ratio": 0.8
+  },
   "checks": {
     "project_files_complete": true,
     "artifact_files_complete": true,
@@ -135,6 +144,13 @@
     "seed_summary_models_complete": true,
     "rolling_summary_models_complete": true,
     "rolling_window_count_correct": true,
+    "train_val_overlap_absent": true,
+    "train_test_overlap_absent": true,
+    "val_test_overlap_absent": true,
+    "split_gap_matches_config": true,
+    "meta_val_holdout_overlap_absent": true,
+    "meta_val_holdout_is_chronological": true,
+    "train_covers_eval_categories": true,
     "baseline_metrics_non_null": true,
     "ablation_metrics_non_null": true,
     "plant_metrics_non_null": true,
