@@ -1,60 +1,60 @@
 {
   "format_version": 1,
-  "created_at_utc": "2026-04-08T11:19:15.579061+00:00",
+  "created_at_utc": "2026-04-08T17:46:38.111130+00:00",
   "files": [
     {
       "path": "artifacts/metrics/baseline_metrics.csv",
       "exists": true,
-      "size": 1634,
-      "sha256": "6c3d62ea1cd0ee4da9417418fb504e3e0b20767fd44ec869f983a3bf20c69c3b"
+      "size": 1626,
+      "sha256": "8b784aa8103c7060cc670c7b99fdb3cc53d8de9cba62d08f0d60796b19d5a1bb"
     },
     {
       "path": "artifacts/metrics/ablation_metrics.csv",
       "exists": true,
-      "size": 2025,
-      "sha256": "812dd20ca233a36d266adf3b4f9e8fc63e2e3ed17b0f454d7539a9de0f805c47"
+      "size": 2021,
+      "sha256": "41512305a724e71556f65fa9c23c126d0c20a3cf257ab19bbb3edd9b6735d5d0"
     },
     {
       "path": "artifacts/metrics/plant_level_metrics.csv",
       "exists": true,
-      "size": 7322,
-      "sha256": "f23edfe258b3206c0f5830762357d4be88ea616f6b2361928720057a79c31c0e"
+      "size": 7313,
+      "sha256": "becbb6601a26e56d961eaa7ce34e3801f50dbdfd0466e03d84fab0b7ef7a18d0"
     },
     {
       "path": "artifacts/metrics/baseline_daytime_metrics.csv",
       "exists": true,
-      "size": 1605,
-      "sha256": "715ee218b8130ba04123841ca202ef20f7922630f3a7f8af5aca61b8b71861d4"
+      "size": 1616,
+      "sha256": "efe910e7d906609e5d5f83aa90b8dab7963b852dd9192c79bbe973efcb3d1744"
     },
     {
       "path": "artifacts/metrics/baseline_physical_metrics.csv",
       "exists": true,
-      "size": 1147,
-      "sha256": "02a5c1e962c5fbcf2e69188b44a83b03762689df5c64a5d0e851d427e13c1cf1"
+      "size": 1017,
+      "sha256": "244bc52da4e622a64caf5bd7080fbb989fb21437174548166a7d6938903ed7bc"
     },
     {
       "path": "artifacts/metrics/baseline_bvp_metrics.csv",
       "exists": true,
-      "size": 1214,
-      "sha256": "2f0d4826f78a4a5dac3369086a2e9f26e29f95ecdb7388681408581c1e1b9f43"
+      "size": 1226,
+      "sha256": "c58a3fc3dcabfb71a5748fd6c8f910fc3c96440b26acda2e86a93aa0bd62ecb0"
     },
     {
       "path": "artifacts/metrics/plant_level_daytime_metrics.csv",
       "exists": true,
-      "size": 7240,
-      "sha256": "f490c0d1e050e84e810bf871208392666e0f6f5cec1a3e791bce6b3af42fc583"
+      "size": 7225,
+      "sha256": "b227e93d126e51cf129ceabc8527b70849e7bb2e123f82432277ca5366276934"
     },
     {
       "path": "artifacts/metrics/plant_level_physical_metrics.csv",
       "exists": true,
-      "size": 4444,
-      "sha256": "fa6db1a28bdd95d98d12d1c70f96347aec66a533759facea1f1c7245a904b139"
+      "size": 3744,
+      "sha256": "9a03a0afefc8c1a90d21623c819b0e49171b72d220acf8b1c7a020a0c8076635"
     },
     {
       "path": "artifacts/metrics/ablation_bvp_metrics.csv",
       "exists": true,
-      "size": 1541,
-      "sha256": "95e94772caee3fd9c8145d3531f10f4fcdc1d57db9e2c24080a2f960bf3d7482"
+      "size": 1540,
+      "sha256": "7a21e1392bafc1628e8641b2a69cb7e0109ae22877bee59d02192cc231d9405c"
     },
     {
       "path": "artifacts/metrics/subset_counts.csv",
@@ -113,8 +113,8 @@
     {
       "path": "artifacts/reports/result_summary_zh.md",
       "exists": true,
-      "size": 5741,
-      "sha256": "b8d96e53c4b3b24db3c063e80e1a215babee7770a099d8f64fb9f4534a0762a5"
+      "size": 6008,
+      "sha256": "83296734b888039bc3a4c6ec81a15bc65e9c4f59ec09dde211f16ab5debb6873"
     },
     {
       "path": "artifacts/reports/robustness_summary_zh.md",
@@ -125,14 +125,14 @@
     {
       "path": "artifacts/reports/sdm_positioning_zh.md",
       "exists": true,
-      "size": 1704,
-      "sha256": "8f930a6e710401b5a8685542de3a58374588cde8f93e7e968962b049188a9e15"
+      "size": 1703,
+      "sha256": "732708024f66fe830dc3ebc872bbc5bf359faf7c30449a9703b3aed1bf87a133"
     },
     {
       "path": "artifacts/reports/paper_reference_draft_zh.md",
       "exists": true,
-      "size": 15982,
-      "sha256": "2e8736adc1108e5a51e90509d79af070efe6a90f6c70c0ef16543b7d98c26e85"
+      "size": 16249,
+      "sha256": "8a63c5e8136f5d7539d02fe3bd4bf04fb3facb82f133eb9dc33e942c448ee2c0"
     }
   ]
 }

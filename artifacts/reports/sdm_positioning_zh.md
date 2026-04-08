@@ -11,12 +11,12 @@
 - 系统贡献：统一数据处理、图表生成、训练配置记录和项目校验的可复现实验流水线。
 
 ## 3. 当前最能讲的证据
-- 固定切分：`Hybrid` MAE=`0.021530`，优于 `TFT` 的 `0.026838`。
-- 白天子集：`Hybrid` MAE=`0.043451`，优于 `TFT` 的 `0.053429`。
+- 固定切分：`Hybrid` MAE=`0.018880`，优于 `TFT` 的 `0.020472`。
+- 白天子集：`Hybrid` MAE=`0.038638`，优于 `TFT` 的 `0.041120`。
 - 多随机种子：`Hybrid` 平均 MAE 低于 `TFT` 和 `StackedXGB`。
 - rolling-origin：`Hybrid` 平均 MAE 最低。
-- constraint-aware evaluation：`Hybrid` 的 physical violation rate 为 `0.000508`，明显低于 `DNN`，但高于 `TFT` 的 `0.000008` 与 `StackedXGB` 的 `0.000016`。
-- Physics Adjustment 证据：`Hybrid` 在不可行域上的 `BVP=82.801440`，相较 `w/o Physics` 的 `110.053723` 下降 `24.76%`。
+- constraint-aware evaluation：`Hybrid` 的 physical violation rate 为 `0.000097`，明显低于 `DNN`，但高于 `TFT` 的 `0.000000` 与 `StackedXGB` 的 `0.000000`。
+- Physics Adjustment 证据：`Hybrid` 在不可行域上的 `BVP=50.554646`，相较 `w/o Physics` 的 `56.344059` 下降 `10.28%`。
 
 ## 4. 推荐表述
 - 用 `scene-aware interpretable fusion`、`heterogeneous temporal data mining`、`constraint-aware evaluation`。
