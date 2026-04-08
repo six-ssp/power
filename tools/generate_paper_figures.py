@@ -49,6 +49,18 @@ DISPLAY_LABELS = {
     "StackedXGB": "StackXGB",
 }
 
+TICK_LABELS = {
+    "Persistence": "Pers.",
+    "XGBoost": "XGB",
+    "DNN": "DNN",
+    "TFT": "TFT",
+    "MeanAverage": "Mean\nAvg",
+    "StaticBlend": "Static\nBlend",
+    "Hybrid": "Hybrid",
+    "AdaptiveBlend": "Ada\nBlend",
+    "StackedXGB": "Stack\nXGB",
+}
+
 HEATMAP_LABELS = {
     "Persistence": "Persist",
     "XGBoost": "XGB",
@@ -152,22 +164,42 @@ def model_edges(models: pd.Series) -> list[str]:
     return ["#8a3d00" if name == "Hybrid" else EDGE for name in models]
 
 
+def tick_labels(models: pd.Series, wrapped: bool = False) -> list[str]:
+    label_map = TICK_LABELS if wrapped else DISPLAY_LABELS
+    return [label_map.get(name, name) for name in models]
+
+
+def apply_categorical_ticks(
+    axis: plt.Axes,
+    positions: np.ndarray,
+    labels: list[str],
+    *,
+    rotation: float = 0,
+    labelsize: float = 11,
+    ha: str = "center",
+) -> None:
+    axis.set_xticks(positions)
+    axis.set_xticklabels(labels, rotation=rotation, ha=ha, linespacing=0.95)
+    axis.tick_params(axis="x", labelsize=labelsize)
+
+
 def plot_baseline_overview(baseline: pd.DataFrame, output: Path) -> None:
     plot_frame = order_models(baseline).copy()
-    labels = [DISPLAY_LABELS[name] for name in plot_frame["Model"]]
+    x_positions = np.arange(len(plot_frame))
+    labels = tick_labels(plot_frame["Model"], wrapped=True)
 
-    figure, axes = plt.subplots(1, 3, figsize=(16.4, 5.0))
+    figure, axes = plt.subplots(1, 3, figsize=(18.8, 5.8))
     for axis, metric in zip(axes, ["MAE", "RMSE", "R2"]):
         bars = axis.bar(
-            labels,
+            x_positions,
             plot_frame[metric],
             color=model_colors(plot_frame["Model"]),
             edgecolor=model_edges(plot_frame["Model"]),
             linewidth=1.2,
-            width=0.78,
+            width=0.74,
         )
         style_axis(axis, metric, grid_axis="y", tick_rotation=0)
-        axis.tick_params(axis="x", labelsize=11)
+        apply_categorical_ticks(axis, x_positions, labels, labelsize=10.5)
         axis.margins(x=0.05)
         if metric == "R2":
             lower = max(0.975, float(plot_frame[metric].min()) - 0.0015)
@@ -176,7 +208,7 @@ def plot_baseline_overview(baseline: pd.DataFrame, output: Path) -> None:
         else:
             axis.set_ylim(0, float(plot_frame[metric].max()) * 1.14)
             add_bar_labels(axis, bars, "{:.3f}")
-    figure.tight_layout(w_pad=2.0)
+    figure.tight_layout(rect=[0, 0.05, 1, 1], w_pad=2.6)
     figure.savefig(output, dpi=260, bbox_inches="tight")
     plt.close(figure)
 
@@ -186,31 +218,68 @@ def plot_daytime_overview(daytime_baseline: pd.DataFrame, output: Path) -> None:
 
 
 def plot_ablation_overview(ablation: pd.DataFrame, output: Path) -> None:
+    variant_order = [
+        "Full Hybrid",
+        "w/o Physics",
+        "Mean Average",
+        "Equal Weights",
+        "w/o Plant Adaptation",
+        "w/o Scene Adaptation",
+        "w/o XGBoost",
+        "w/o DNN",
+        "w/o TFT",
+        "Adaptive Blend",
+        "Stacked XGB",
+    ]
     rename_map = {
         "Full Hybrid": "Full\nHybrid",
         "w/o Physics": "w/o\nPhysics",
-        "w/o Plant Adaptation": "w/o Plant\nAdaptation",
-        "w/o Scene Adaptation": "w/o Scene\nAdaptation",
+        "Mean Average": "Mean\nAvg",
+        "Equal Weights": "Equal\nWeights",
+        "w/o Plant Adaptation": "w/o Plant\nAdapt.",
+        "w/o Scene Adaptation": "w/o Scene\nAdapt.",
+        "w/o XGBoost": "w/o\nXGB",
+        "w/o DNN": "w/o\nDNN",
+        "w/o TFT": "w/o\nTFT",
+        "Adaptive Blend": "Ada\nBlend",
+        "Stacked XGB": "Stack\nXGB",
     }
-    plot_frame = ablation[ablation["Model"].isin(rename_map.keys())].copy()
+    color_map = {
+        "Full Hybrid": "#D55E00",
+        "w/o Physics": "#FFD92F",
+        "Mean Average": "#E69F00",
+        "Equal Weights": "#F0E442",
+        "w/o Plant Adaptation": "#8DA0CB",
+        "w/o Scene Adaptation": "#CC79A7",
+        "w/o XGBoost": "#56B4E9",
+        "w/o DNN": "#66C2A5",
+        "w/o TFT": "#FC8D62",
+        "Adaptive Blend": "#A6D854",
+        "Stacked XGB": "#C67AA9",
+    }
+    plot_frame = ablation.copy()
+    plot_frame["_order"] = plot_frame["Model"].map({name: idx for idx, name in enumerate(variant_order)})
+    plot_frame = plot_frame.sort_values("_order").drop(columns="_order")
     plot_frame["VariantDisplay"] = plot_frame["Model"].map(rename_map)
-    colors = ["#D55E00", "#FFD92F", "#8DA0CB", "#CC79A7"]
+    colors = [color_map[name] for name in plot_frame["Model"]]
 
-    figure, axes = plt.subplots(1, 2, figsize=(13.8, 4.8))
+    x_positions = np.arange(len(plot_frame))
+    figure, axes = plt.subplots(2, 1, figsize=(19.2, 8.6), sharex=True)
     for axis, metric in zip(axes, ["MAE", "RMSE"]):
         bars = axis.bar(
-            plot_frame["VariantDisplay"],
+            x_positions,
             plot_frame[metric],
             color=colors,
             edgecolor=EDGE,
             linewidth=1.2,
-            width=0.78,
+            width=0.72,
         )
         style_axis(axis, f"Hybrid Ablation: {metric}", grid_axis="y", tick_rotation=0)
-        axis.tick_params(axis="x", labelsize=11)
+        apply_categorical_ticks(axis, x_positions, plot_frame["VariantDisplay"].tolist(), labelsize=10.0)
         axis.set_ylim(0, float(plot_frame[metric].max()) * 1.14)
         add_bar_labels(axis, bars, "{:.3f}")
-    figure.tight_layout(w_pad=2.0)
+        axis.margins(x=0.02)
+    figure.tight_layout(rect=[0, 0.03, 1, 1], h_pad=1.8)
     figure.savefig(output, dpi=260, bbox_inches="tight")
     plt.close(figure)
 
@@ -260,11 +329,12 @@ def plot_relative_improvement(baseline: pd.DataFrame, output: Path) -> None:
     plot_frame = baseline[baseline["Model"] != "Persistence"].copy()
     plot_frame["MAE_Improvement_%"] = (persistence_mae - plot_frame["MAE"]) / persistence_mae * 100.0
     plot_frame = order_models(plot_frame)
-    labels = [DISPLAY_LABELS[name] for name in plot_frame["Model"]]
+    x_positions = np.arange(len(plot_frame))
+    labels = tick_labels(plot_frame["Model"], wrapped=True)
 
-    figure, axis = plt.subplots(figsize=(9.2, 4.8))
+    figure, axis = plt.subplots(figsize=(14.2, 5.2))
     bars = axis.bar(
-        labels,
+        x_positions,
         plot_frame["MAE_Improvement_%"],
         color=model_colors(plot_frame["Model"]),
         edgecolor=model_edges(plot_frame["Model"]),
@@ -272,10 +342,10 @@ def plot_relative_improvement(baseline: pd.DataFrame, output: Path) -> None:
         width=0.78,
     )
     style_axis(axis, "Relative MAE Improvement over Persistence", ylabel="Improvement (%)", grid_axis="y", tick_rotation=0)
-    axis.tick_params(axis="x", labelsize=11)
+    apply_categorical_ticks(axis, x_positions, labels, labelsize=10.5)
     axis.set_ylim(0, float(plot_frame["MAE_Improvement_%"].max()) * 1.16)
     add_bar_labels(axis, bars, "{:.1f}")
-    figure.tight_layout()
+    figure.tight_layout(rect=[0, 0.05, 1, 1])
     figure.savefig(output, dpi=260, bbox_inches="tight")
     plt.close(figure)
 
@@ -431,12 +501,13 @@ def plot_seed_stability(seed_summary: pd.DataFrame, output: Path) -> None:
     focus_models = ["DNN", "TFT", "Hybrid", "AdaptiveBlend", "StackedXGB"]
     plot_frame = seed_summary[seed_summary["Model"].isin(focus_models)].copy()
     plot_frame = order_models(plot_frame)
-    labels = [DISPLAY_LABELS[name] for name in plot_frame["Model"]]
+    x_positions = np.arange(len(plot_frame))
+    labels = tick_labels(plot_frame["Model"], wrapped=True)
 
-    figure, axes = plt.subplots(1, 2, figsize=(12.8, 4.9))
+    figure, axes = plt.subplots(1, 2, figsize=(13.4, 5.0))
     for axis, metric in zip(axes, ["MAE", "RMSE"]):
         bars = axis.bar(
-            labels,
+            x_positions,
             plot_frame[f"{metric}_mean"],
             yerr=plot_frame[f"{metric}_std"],
             capsize=4,
@@ -446,10 +517,10 @@ def plot_seed_stability(seed_summary: pd.DataFrame, output: Path) -> None:
             width=0.76,
         )
         style_axis(axis, f"Seed Stability: {metric}", grid_axis="y", tick_rotation=0)
-        axis.tick_params(axis="x", labelsize=11)
+        apply_categorical_ticks(axis, x_positions, labels, labelsize=10.5)
         axis.set_ylim(0, float(plot_frame[f"{metric}_mean"].max()) * 1.20)
         add_bar_labels(axis, bars, "{:.3f}")
-    figure.tight_layout(w_pad=2.0)
+    figure.tight_layout(rect=[0, 0.04, 1, 1], w_pad=2.2)
     figure.savefig(output, dpi=260, bbox_inches="tight")
     plt.close(figure)
 
@@ -481,7 +552,8 @@ def plot_bvp_overview(baseline_bvp: pd.DataFrame, ablation_bvp: pd.DataFrame, ou
     focus_models = ["DNN", "TFT", "MeanAverage", "StaticBlend", "Hybrid", "StackedXGB"]
     baseline_focus = baseline_bvp[baseline_bvp["Model"].isin(focus_models)].copy()
     baseline_focus = order_models(baseline_focus)
-    labels = [DISPLAY_LABELS[name] for name in baseline_focus["Model"]]
+    x_positions = np.arange(len(baseline_focus))
+    labels = tick_labels(baseline_focus["Model"], wrapped=True)
 
     full_hybrid_bvp = float(ablation_bvp.loc[ablation_bvp["Model"] == "Full Hybrid", "BVP"].iloc[0])
     wophys_bvp = float(ablation_bvp.loc[ablation_bvp["Model"] == "w/o Physics", "BVP"].iloc[0])
@@ -497,10 +569,10 @@ def plot_bvp_overview(baseline_bvp: pd.DataFrame, ablation_bvp: pd.DataFrame, ou
         }
     )
 
-    figure, axes = plt.subplots(1, 3, figsize=(16.2, 4.9))
+    figure, axes = plt.subplots(1, 3, figsize=(18.0, 5.1))
 
     bars_bvp = axes[0].bar(
-        labels,
+        x_positions,
         baseline_focus["BVP"],
         color=model_colors(baseline_focus["Model"]),
         edgecolor=model_edges(baseline_focus["Model"]),
@@ -508,12 +580,12 @@ def plot_bvp_overview(baseline_bvp: pd.DataFrame, ablation_bvp: pd.DataFrame, ou
         width=0.76,
     )
     style_axis(axes[0], "Positive Energy Leakage (BVP)", ylabel="BVP", grid_axis="y")
-    axes[0].tick_params(axis="x", labelsize=11)
+    apply_categorical_ticks(axes[0], x_positions, labels, labelsize=10.5)
     axes[0].set_ylim(0, float(baseline_focus["BVP"].max()) * 1.16)
     add_bar_labels(axes[0], bars_bvp, "{:.1f}")
 
     bars_bvp_mae = axes[1].bar(
-        labels,
+        x_positions,
         baseline_focus["BVPMAE"],
         color=model_colors(baseline_focus["Model"]),
         edgecolor=model_edges(baseline_focus["Model"]),
@@ -521,7 +593,7 @@ def plot_bvp_overview(baseline_bvp: pd.DataFrame, ablation_bvp: pd.DataFrame, ou
         width=0.76,
     )
     style_axis(axes[1], "Infeasible-Region MAE", ylabel="MAE", grid_axis="y")
-    axes[1].tick_params(axis="x", labelsize=11)
+    apply_categorical_ticks(axes[1], x_positions, labels, labelsize=10.5)
     axes[1].set_ylim(0, float(baseline_focus["BVPMAE"].max()) * 1.18)
     add_bar_labels(axes[1], bars_bvp_mae, "{:.3f}")
 
@@ -568,7 +640,7 @@ def plot_bvp_overview(baseline_bvp: pd.DataFrame, ablation_bvp: pd.DataFrame, ou
                 color=TEXT,
             )
 
-    figure.tight_layout(w_pad=2.2)
+    figure.tight_layout(rect=[0, 0.04, 1, 1], w_pad=2.4)
     figure.savefig(output, dpi=260, bbox_inches="tight")
     plt.close(figure)
 
@@ -640,7 +712,7 @@ def write_catalog_clean(output: Path) -> None:
             "- Daytime-only comparison on MAE, RMSE, and R2.",
             "",
             "## ablation_overview.png",
-            "- Hybrid ablation comparison on MAE and RMSE.",
+            "- Complete 11-way Hybrid ablation comparison on MAE and RMSE.",
             "",
             "## plant_mae_heatmap.png",
             "- Per-plant MAE heatmap across models.",

@@ -21,6 +21,18 @@ PLANT_TITLE_MAP = {
     "Plant_4A_高效对比": "HighEfficiency 4A",
 }
 
+PLOT_TICK_LABEL_MAP = {
+    "Persistence": "Pers.",
+    "XGBoost": "XGB",
+    "DNN": "DNN",
+    "TFT": "TFT",
+    "MeanAverage": "Mean\nAvg",
+    "StaticBlend": "Static\nBlend",
+    "Hybrid": "Hybrid",
+    "AdaptiveBlend": "Ada\nBlend",
+    "StackedXGB": "Stack\nXGB",
+}
+
 
 def compute_metrics(frame: pd.DataFrame, prediction_column: str) -> dict[str, float]:
     y_true = frame["target_power"].to_numpy(dtype=float)
@@ -162,17 +174,27 @@ def save_metrics_table(rows: list[dict[str, float | str]], path: Path) -> pd.Dat
     return table
 
 
+def apply_plot_tick_labels(axis: plt.Axes, labels: list[str]) -> None:
+    positions = np.arange(len(labels))
+    axis.set_xticks(positions)
+    axis.set_xticklabels(labels, rotation=0, ha="center", linespacing=0.95)
+    axis.tick_params(axis="x", labelsize=10.5)
+
+
 def plot_metric_bars(metric_table: pd.DataFrame, path: Path) -> None:
-    figure, axes = plt.subplots(1, 2, figsize=(12, 4))
-    axes[0].bar(metric_table["Model"], metric_table["MAE"], color="#4c78a8")
+    labels = [PLOT_TICK_LABEL_MAP.get(name, name) for name in metric_table["Model"].tolist()]
+    x_positions = np.arange(len(labels))
+
+    figure, axes = plt.subplots(1, 2, figsize=(14.2, 4.8))
+    axes[0].bar(x_positions, metric_table["MAE"], color="#4c78a8")
     axes[0].set_title("MAE Comparison")
-    axes[0].tick_params(axis="x", rotation=20)
+    apply_plot_tick_labels(axes[0], labels)
 
-    axes[1].bar(metric_table["Model"], metric_table["RMSE"], color="#f58518")
+    axes[1].bar(x_positions, metric_table["RMSE"], color="#f58518")
     axes[1].set_title("RMSE Comparison")
-    axes[1].tick_params(axis="x", rotation=20)
+    apply_plot_tick_labels(axes[1], labels)
 
-    figure.tight_layout()
+    figure.tight_layout(rect=[0, 0.04, 1, 1])
     figure.savefig(path, dpi=180, bbox_inches="tight")
     plt.close(figure)
 

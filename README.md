@@ -50,20 +50,36 @@ This repository is a research codebase for `5-minute-ahead` photovoltaic power f
 | --- | ---: | ---: | ---: |
 | Persistence | 0.049670 | 0.175950 | 0.980560 |
 | XGBoost | 0.042605 | 0.087974 | 0.995140 |
-| DNN | 0.033542 | 0.068490 | 0.997054 |
-| TFT | 0.026838 | 0.070332 | 0.996894 |
-| MeanAverage | 0.022700 | 0.066302 | 0.997240 |
-| StaticBlend | 0.023153 | 0.066229 | 0.997246 |
-| Hybrid | 0.021530 | 0.064468 | 0.997390 |
-| AdaptiveBlend | 0.024887 | 0.075229 | 0.996446 |
-| StackedXGB | 0.029018 | 0.067131 | 0.997170 |
+| DNN | 0.028391 | 0.067772 | 0.997116 |
+| TFT | 0.020472 | 0.060960 | 0.997666 |
+| MeanAverage | 0.021889 | 0.063961 | 0.997431 |
+| StaticBlend | 0.019060 | 0.060239 | 0.997721 |
+| Hybrid | 0.018880 | 0.059906 | 0.997746 |
+| AdaptiveBlend | 0.021832 | 0.067281 | 0.997157 |
+| StackedXGB | 0.030325 | 0.067355 | 0.997151 |
+
+### Hybrid Ablation Results
+
+| Variant | MAE | RMSE |
+| --- | ---: | ---: |
+| Full Hybrid | 0.018880 | 0.059906 |
+| w/o Physics | 0.018927 | 0.059906 |
+| Mean Average | 0.021889 | 0.063961 |
+| Equal Weights | 0.020937 | 0.063913 |
+| w/o Plant Adaptation | 0.019362 | 0.060116 |
+| w/o Scene Adaptation | 0.019060 | 0.060239 |
+| w/o XGBoost | 0.019260 | 0.059845 |
+| w/o DNN | 0.020145 | 0.061245 |
+| w/o TFT | 0.023070 | 0.067829 |
+| Adaptive Blend | 0.021832 | 0.067281 |
+| Stacked XGB | 0.030325 | 0.067355 |
 
 ### Robustness Summary
 
 | Setting | TFT | Hybrid | StackedXGB |
 | --- | ---: | ---: | ---: |
-| Fixed split MAE | 0.026838 | 0.021530 | 0.029018 |
-| Daytime-only MAE | 0.053429 | 0.043451 | 0.052496 |
+| Fixed split MAE | 0.020472 | 0.018880 | 0.030325 |
+| Daytime-only MAE | 0.041120 | 0.038638 | 0.054287 |
 | Multi-seed MAE | 0.021144 +/- 0.004029 | 0.018796 +/- 0.001966 | 0.026599 +/- 0.005934 |
 | Rolling-origin MAE | 0.033845 +/- 0.008390 | 0.027830 +/- 0.006528 | 0.034299 +/- 0.008551 |
 
@@ -71,12 +87,15 @@ This repository is a research codebase for `5-minute-ahead` photovoltaic power f
 
 | Model | PhysicalViolationRate | NegativeRate | NightPositiveRateOnNight |
 | --- | ---: | ---: | ---: |
-| MeanAverage | 0.000403 | 0.000371 | 0.000062 |
-| StaticBlend | 0.000815 | 0.000783 | 0.000062 |
-| Hybrid | 0.000508 | 0.000492 | 0.000031 |
-| TFT | 0.000008 | 0.000008 | 0.000000 |
-| StackedXGB | 0.000016 | 0.000000 | 0.000031 |
-| DNN | 0.099240 | 0.099192 | 0.000093 |
+| Persistence | 0.000008 | 0.000000 | 0.000015 |
+| XGBoost | 0.002114 | 0.000000 | 0.004059 |
+| DNN | 0.004639 | 0.004494 | 0.000279 |
+| TFT | 0.000000 | 0.000000 | 0.000000 |
+| MeanAverage | 0.000363 | 0.000299 | 0.000124 |
+| StaticBlend | 0.000218 | 0.000210 | 0.000015 |
+| Hybrid | 0.000097 | 0.000097 | 0.000000 |
+| AdaptiveBlend | 0.000153 | 0.000137 | 0.000031 |
+| StackedXGB | 0.000000 | 0.000000 | 0.000000 |
 
 ### BVP on Physically Infeasible Region
 
@@ -91,20 +110,37 @@ BVP = sum max(y_hat_t, 0),  t in Omega_bvp
 | Persistence | 30.888064 | 0.000458 | 0.000323 |
 | XGBoost | 1369.826438 | 0.020315 | 0.020106 |
 | DNN | 40.385780 | 0.000599 | 0.019131 |
-| TFT | 138.271500 | 0.002051 | 0.002817 |
+| TFT | 41.876773 | 0.000621 | 0.001806 |
 | MeanAverage | 133.555242 | 0.001981 | 0.002648 |
-| StaticBlend | 62.286833 | 0.000924 | 0.003651 |
-| Hybrid | 82.801440 | 0.001228 | 0.002170 |
-| AdaptiveBlend | 43.576948 | 0.000646 | 0.004129 |
-| StackedXGB | 537.819166 | 0.007976 | 0.007798 |
+| StaticBlend | 49.076498 | 0.000728 | 0.001374 |
+| Hybrid | 50.554646 | 0.000750 | 0.001198 |
+| AdaptiveBlend | 162.332425 | 0.002407 | 0.002307 |
+| StackedXGB | 597.658303 | 0.008864 | 0.008683 |
+
+### Hybrid Ablation BVP
+
+| Variant | BVP | BVPMAE |
+| --- | ---: | ---: |
+| Full Hybrid | 50.554646 | 0.001198 |
+| w/o Physics | 56.344059 | 0.001284 |
+| Mean Average | 281.683668 | 0.004086 |
+| Equal Weights | 163.722051 | 0.002336 |
+| w/o Plant Adaptation | 50.647489 | 0.001215 |
+| w/o Scene Adaptation | 49.076498 | 0.001374 |
+| w/o XGBoost | 40.295560 | 0.001910 |
+| w/o DNN | 48.764927 | 0.001178 |
+| w/o TFT | 109.800958 | 0.002533 |
+| Adaptive Blend | 162.332425 | 0.002307 |
+| Stacked XGB | 597.658303 | 0.008683 |
 
 Current takeaway:
 
-- `Hybrid` is the strongest overall method under the current fixed split, daytime-only split, multi-seed summary, and rolling-origin summary.
+- `Hybrid` is the strongest released model on the fixed split and remains ahead of `TFT` under daytime-only, multi-seed, and rolling-origin evaluation.
 - `TFT` becomes materially stronger after the higher training budget, so the current comparison is more credible than the earlier exploratory version.
-- `MeanAverage` and `StaticBlend` are now restored as lightweight ensemble controls, making the fixed-split baseline table complete at `9` models.
+- `MeanAverage` and `StaticBlend` are now restored as lightweight ensemble controls, so the fixed-split baseline table and baseline overview figure both contain the full `9` models.
+- The Hybrid ablation table and ablation overview figure now contain the full `11` variants rather than only a selected subset.
 - `Hybrid` is not the absolute best physical-consistency model, but it keeps violation rates low while delivering the best overall accuracy.
-- For the Physics Adjustment ablation, `Hybrid` reduces infeasible-region `BVP` from `110.053723` to `82.801440` against `w/o Physics`, a `24.76%` drop.
+- For the Physics Adjustment ablation, `Hybrid` reduces infeasible-region `BVP` from `56.344059` to `50.554646` against `w/o Physics`, a `10.28%` drop.
 
 ## Training Budget
 
@@ -188,6 +224,12 @@ Rebuild split parts from local raw CSV files:
   <tr>
     <td align="center">Multi-seed stability</td>
     <td align="center">Rolling-origin evaluation</td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="artifacts/paper_figures/ablation_overview.png" width="100%" alt="Ablation overview"></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">Complete 11-way Hybrid ablation on MAE and RMSE</td>
   </tr>
   <tr>
     <td colspan="2"><img src="artifacts/paper_figures/bvp_overview.png" width="100%" alt="BVP overview"></td>

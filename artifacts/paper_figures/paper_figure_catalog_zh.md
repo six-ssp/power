@@ -7,7 +7,7 @@
 - Daytime-only comparison on MAE, RMSE, and R2.
 
 ## ablation_overview.png
-- Hybrid ablation comparison on MAE and RMSE.
+- Complete 11-way Hybrid ablation comparison on MAE and RMSE.
 
 ## plant_mae_heatmap.png
 - Per-plant MAE heatmap across models.
